@@ -10,7 +10,7 @@ import { PWAInstallPromptBanner } from './components/PWAInstallPromptBanner';
 import { ResetModal } from './components/ResetModal';
 import { ShellHeader } from './components/ShellHeader';
 import { TerminalScreen } from './components/TerminalScreen';
-import { VerificationModal } from './components/VerificationModal';
+import { CommandGuideModal } from './components/CommandGuideModal';
 import { executeCommand } from './engine/commands/registry';
 import { LabContext } from './engine/context';
 import { defaultPSEngine } from './engine/powershell/pipeline';
@@ -33,7 +33,7 @@ export default function App() {
 
   // Modals / Drawers
   const [isResetModalOpen, setIsResetModalOpen] = useState<boolean>(false);
-  const [isTranscriptsOpen, setIsTranscriptsOpen] = useState<boolean>(false);
+  const [isCommandGuideOpen, setIsCommandGuideOpen] = useState<boolean>(false);
 
   // Load history from session or local if needed (omitted for brevity, keeping existing initial states)
   const [entries, setEntries] = useState<TerminalEntry[]>([
@@ -250,6 +250,16 @@ export default function App() {
     document.getElementById('terminal-input')?.focus();
   };
 
+  const handleSelectGuideCommand = (command: string, targetShell: 'cmd' | 'ps') => {
+    if (targetShell !== shellMode) {
+      handleSwitchMode(targetShell);
+    }
+    setCmdInput(command);
+    setTimeout(() => {
+      document.getElementById('terminal-input')?.focus();
+    }, 150);
+  };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -327,7 +337,7 @@ export default function App() {
         shellMode={shellMode}
         onSwitchMode={handleSwitchMode}
         onOpenReset={() => setIsResetModalOpen(true)}
-        onOpenTranscripts={() => setIsTranscriptsOpen(true)}
+        onOpenCommands={() => setIsCommandGuideOpen(true)}
       />
 
       {/* Dismissible First-Time PWA Install Prompt Banner */}
@@ -363,10 +373,12 @@ export default function App() {
         onConfirm={handleResetLab}
       />
 
-      {/* Verification Transcripts Modal for Grading / Testing */}
-      <VerificationModal
-        isOpen={isTranscriptsOpen}
-        onClose={() => setIsTranscriptsOpen(false)}
+      {/* Interactive Command Reference & Practice Guide Modal */}
+      <CommandGuideModal
+        isOpen={isCommandGuideOpen}
+        onClose={() => setIsCommandGuideOpen(false)}
+        onSelectCommand={handleSelectGuideCommand}
+        activeShell={shellMode}
       />
 
       {/* Unobtrusive Working Offline & Device Saved Indicator */}

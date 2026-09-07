@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { CheckCircle2, HardDrive, RotateCcw, Terminal, WifiOff } from 'lucide-react';
+import { BookOpen, HardDrive, RotateCcw, Terminal, WifiOff } from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { PWAInstallButton } from './PWAInstallButton';
 
@@ -7,14 +7,14 @@ interface ShellHeaderProps {
   shellMode: 'cmd' | 'ps';
   onSwitchMode: (mode: 'cmd' | 'ps') => void;
   onOpenReset: () => void;
-  onOpenTranscripts: () => void;
+  onOpenCommands: () => void;
 }
 
 export function ShellHeader({
   shellMode,
   onSwitchMode,
   onOpenReset,
-  onOpenTranscripts,
+  onOpenCommands,
 }: ShellHeaderProps) {
   const isPS = shellMode === 'ps';
   const isOnline = useOnlineStatus();
@@ -75,12 +75,14 @@ export function ShellHeader({
           <motion.button
             whileTap={{ scale: 0.95 }}
             type="button"
-            id="view-transcripts-btn"
-            onClick={onOpenTranscripts}
-            className="p-1 rounded text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
-            title="View Phase 1-3 Verification Test Transcripts"
+            id="view-commands-btn"
+            onClick={onOpenCommands}
+            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-neutral-800/80 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 transition-colors"
+            title="Command Reference & Practice Guide (Basic to Advanced)"
+            aria-label="Commands Guide"
           >
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline font-medium">Commands</span>
           </motion.button>
         </div>
       </div>

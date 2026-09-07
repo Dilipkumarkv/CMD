@@ -2,8 +2,8 @@
 
 /* Custom authentic terminal scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 3px;
 }
 
 ::-webkit-scrollbar-track {
@@ -12,11 +12,35 @@
 
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(52, 211, 153, 0.4);
+}
+
+/* Ultra-slim horizontal & vertical scrollbar */
+.slim-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.slim-scrollbar::-webkit-scrollbar {
+  height: 3px;
+  width: 3px;
+}
+
+.slim-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.slim-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+}
+
+.slim-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(52, 211, 153, 0.5);
 }
 
 /* Prevent double-tap zoom on fast tapping buttons on mobile Safari */
