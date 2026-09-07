@@ -1,0 +1,33 @@
+{
+  "id": "/",
+  "name": "SNA Terminal Lab",
+  "short_name": "SNA Terminal",
+  "description": "Offline Windows CMD and PowerShell practice lab for System and Network Administration polytechnic students.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c0c0c",
+  "theme_color": "#0c0c0c",
+  "categories": ["education", "utilities", "developer"],
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

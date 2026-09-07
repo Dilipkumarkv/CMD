@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <rect width="512" height="512" rx="96" fill="#011c40" stroke="#0ea5e9" stroke-width="8"/>
+  <!-- Top Title Bar -->
+  <path d="M0 96 C0 43 43 0 96 0 L416 0 C469 0 512 43 512 96 L512 110 L0 110 Z" fill="#01142c"/>
+  <line x1="0" y1="110" x2="512" y2="110" stroke="#0ea5e9" stroke-opacity="0.3" stroke-width="2"/>
+  <!-- Window Controls -->
+  <circle cx="60" cy="55" r="14" fill="#ef4444"/>
+  <circle cx="105" cy="55" r="14" fill="#f59e0b"/>
+  <circle cx="150" cy="55" r="14" fill="#10b981"/>
+  <text x="256" y="62" fill="#94a3b8" font-family="ui-monospace, monospace" font-size="22" font-weight="600" text-anchor="middle">SNA Lab</text>
+  <!-- Terminal Prompt -->
+  <path d="M120 200 L220 290 L120 380" fill="none" stroke="#38bdf8" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Cursor -->
+  <line x1="260" y1="380" x2="380" y2="380" stroke="#22c55e" stroke-width="28" stroke-linecap="round"/>
+</svg>
