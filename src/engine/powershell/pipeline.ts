@@ -1,4 +1,7 @@
 import { LabContext } from '../context';
+import { defaultRegistry } from '../commands/registry';
+import { ipconfigCommand } from '../commands/network-commands';
+import { diskpartCommand } from '../commands/syllabus-commands';
 import {
   addContentCmdlet,
   clearHostCmdlet,
@@ -88,8 +91,94 @@ export class PowerShellEngine {
     this.register(['get-vm'], getVMCmdlet);
     this.register(['get-vmswitch'], getVMSwitchCmdlet);
     this.register(['get-vpnconnection'], getVpnConnectionCmdlet);
-    this.register(['get-disk'], getDiskCmdlet);
-    this.register(['get-volume'], getVolumeCmdlet);
+    this.register(['get-disk', 'list-disk', 'gdisk'], getDiskCmdlet);
+    this.register(['get-volume', 'list-volume', 'gvol'], getVolumeCmdlet);
+
+    // Support "list disk", "list volume", "diskpart" in PowerShell
+    const listCmdlet: PSCmdletHandler = (stage, { context }) => {
+      const target = (stage.positional[0] || '').toLowerCase();
+      if (target === 'disk' || target === 'disks') {
+        return getDiskCmdlet(stage, { context });
+      }
+      if (target === 'volume' || target === 'volumes' || target === 'vol' || target === 'v') {
+        return getVolumeCmdlet(stage, { context });
+      }
+      if (target === 'partition' || target === 'partitions' || target === 'part') {
+        const cur = context.disks.find((d) => d.diskNum === context.selectedDiskIndex) || context.disks[0];
+        return cur.partitions.map((p) => ({
+          PartitionNumber: p.partNum,
+          Type: p.type,
+          Size: `${p.sizeGB} GB`,
+          Offset: `${Math.round(p.offsetKB / 1024)} MB`,
+          _type: 'Partition',
+        }));
+      }
+      return [
+        { Command: 'list disk', Description: 'Display a list of storage disks' },
+        { Command: 'list volume', Description: 'Display a list of storage volumes' },
+        { Command: 'list partition', Description: 'Display a list of disk partitions' },
+      ];
+    };
+    this.register(['list'], listCmdlet);
+
+    const diskpartCmdlet: PSCmdletHandler = (stage, { context }) => {
+      const res = diskpartCommand(stage.positional, stage.named, [], context, stage.raw);
+      return res.text;
+    };
+    this.register(['diskpart'], diskpartCmdlet);
+
+    // ipconfig handler in PowerShell
+    const ipconfigCmdlet: PSCmdletHandler = (stage, { context }) => {
+      const allArgs = [
+        ...stage.positional,
+        ...Object.keys(stage.named),
+        ...Object.entries(stage.named).map(([k, v]) => `-${k}:${v}`),
+      ];
+      const rawLower = allArgs.join(' ').toLowerCase();
+      const isAll = Boolean(
+        stage.named['all'] ||
+        stage.named['a'] ||
+        rawLower.includes('/all') ||
+        rawLower.includes('-all') ||
+        rawLower.includes('all')
+      );
+      const isFlush = Boolean(
+        stage.named['flushdns'] ||
+        stage.named['flush'] ||
+        rawLower.includes('/flushdns') ||
+        rawLower.includes('-flushdns') ||
+        rawLower.includes('flushdns')
+      );
+      const isRelease = Boolean(
+        stage.named['release'] ||
+        rawLower.includes('/release') ||
+        rawLower.includes('-release') ||
+        rawLower.includes('release')
+      );
+      const isRenew = Boolean(
+        stage.named['renew'] ||
+        rawLower.includes('/renew') ||
+        rawLower.includes('-renew') ||
+        rawLower.includes('renew')
+      );
+
+      const flags: Record<string, string | boolean> = {};
+      if (isAll) flags['all'] = true;
+      if (isFlush) flags['flushdns'] = true;
+      if (isRelease) flags['release'] = true;
+      if (isRenew) flags['renew'] = true;
+
+      const switches = [
+        ...(isAll ? ['/all'] : []),
+        ...(isFlush ? ['/flushdns'] : []),
+        ...(isRelease ? ['/release'] : []),
+        ...(isRenew ? ['/renew'] : []),
+      ];
+
+      const res = ipconfigCommand(stage.positional, flags, switches, context, stage.raw);
+      return res.text;
+    };
+    this.register(['ipconfig', 'ipconfig.exe'], ipconfigCmdlet);
 
     // Generic pipeline stages
     this.register(['where-object', 'where', '?'], whereObjectCmdlet);
@@ -100,7 +189,23 @@ export class PowerShellEngine {
   public execute(rawInput: string, context: LabContext): PSCommandResult {
     let line = rawInput.trim();
     if (!line) {
+      if (context.inDiskPart === 'ps') {
+        return { error: false, text: 'DISKPART>' }; // Will be intercepted by diskpartCommand if sent
+      }
       return { error: false, text: '' };
+    }
+
+    if (context.inDiskPart === 'ps') {
+      const tokens = tokenizeStage(line);
+      try {
+        const res = diskpartCommand(tokens.positional, tokens.named, [], context, tokens.raw);
+        return {
+          error: res.error,
+          text: res.text,
+        };
+      } catch (e: any) {
+        return { error: true, text: `Diskpart encountered an error: ${e.message}` };
+      }
     }
 
     // 1. Handle variable assignment: $var = <expression / pipeline>
@@ -157,7 +262,21 @@ export class PowerShellEngine {
         continue;
       }
 
-      const handler = this.registry.get(parsedStage.cmdlet.toLowerCase());
+      let handler = this.registry.get(parsedStage.cmdlet.toLowerCase());
+      if (!handler) {
+        // Fallback to defaultRegistry for standard Windows commands (e.g., ping, netstat, nslookup, tasklist, etc.)
+        const cleanName = parsedStage.cmdlet.toLowerCase().replace(/\.exe$/i, '');
+        const fallbackCmd = defaultRegistry[cleanName];
+        if (fallbackCmd) {
+          handler = (stage, { context: ctx }) => {
+            const rawSwitches = stage.positional.filter((p) => p.startsWith('/') || p.startsWith('-'));
+            const cleanPos = stage.positional.filter((p) => !p.startsWith('/') && !p.startsWith('-'));
+            const res = fallbackCmd(cleanPos, stage.named, rawSwitches, ctx, stage.raw);
+            return res.text;
+          };
+        }
+      }
+
       if (!handler) {
         return {
           error: true,

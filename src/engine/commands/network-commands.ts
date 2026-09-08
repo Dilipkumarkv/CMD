@@ -1,10 +1,60 @@
 import { CommandHandler } from './types';
 
 export const ipconfigCommand: CommandHandler = (args, flags, switches, context) => {
-  const isAll = Boolean(flags['all'] || switches.some((s) => s.toLowerCase() === '/all'));
-  const isFlush = Boolean(flags['flushdns'] || switches.some((s) => s.toLowerCase() === '/flushdns'));
-  const isRelease = Boolean(flags['release'] || switches.some((s) => s.toLowerCase() === '/release'));
-  const isRenew = Boolean(flags['renew'] || switches.some((s) => s.toLowerCase() === '/renew'));
+  const allInputs = [...args, ...switches, ...Object.keys(flags)].map((s) => s.toLowerCase());
+
+  const isHelp = Boolean(
+    flags['?'] ||
+    flags['help'] ||
+    allInputs.some((s) => s === '/?' || s === '-?' || s === '/help' || s === 'help')
+  );
+
+  if (isHelp) {
+    const helpLines = [
+      'USAGE:',
+      '    ipconfig [/allcompartments] [/? | /all |',
+      '                                 /renew [adapter] | /release [adapter] |',
+      '                                 /renew6 [adapter] | /release6 [adapter] |',
+      '                                 /flushdns | /displaydns | /registerdns |',
+      '                                 /showclassid adapter |',
+      '                                 /setclassid adapter [classid] |',
+      '                                 /showclassid6 adapter |',
+      '                                 /setclassid6 adapter [classid] ]',
+      '',
+      'where',
+      '    adapter             Connection name',
+      '                       (wildcard characters * and ? allowed, see examples)',
+      '',
+      '    Options:',
+      '       /?               Display this help message',
+      '       /all             Display full configuration information.',
+      '       /release         Release the IPv4 address for the specified adapter.',
+      '       /renew           Renew the IPv4 address for the specified adapter.',
+      '       /flushdns        Purges the DNS Resolver Cache.',
+      '       /registerdns     Refreshes all DHCP leases and re-registers DNS names.',
+      '       /displaydns      Display the contents of the DNS Resolver Cache.',
+    ];
+    return { error: false, text: helpLines.join('\n') };
+  }
+
+  const isAll = Boolean(
+    flags['all'] ||
+    flags['a'] ||
+    allInputs.some((s) => s === '/all' || s === '-all' || s === 'all' || s === '/a' || s === '-a')
+  );
+  const isFlush = Boolean(
+    flags['flushdns'] ||
+    flags['flush'] ||
+    allInputs.some((s) => s === '/flushdns' || s === '-flushdns' || s === 'flushdns')
+  );
+  const isRelease = Boolean(
+    flags['release'] ||
+    allInputs.some((s) => s === '/release' || s === '-release' || s === 'release')
+  );
+  const isRenew = Boolean(
+    flags['renew'] ||
+    allInputs.some((s) => s === '/renew' || s === '-renew' || s === 'renew')
+  );
 
   if (isFlush) {
     context.network.dnsCacheFlushed = true;

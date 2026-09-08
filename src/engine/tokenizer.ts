@@ -58,6 +58,16 @@ export function parseCommandLine(line: string): ParsedCommand {
   let commandName = (rawTokens[0] || '').toLowerCase();
   let restTokens = rawTokens.slice(1);
 
+  // Handle attached switches in commandName, e.g. "ipconfig/all", "dir/w/p", "chkdsk/f"
+  if (commandName.includes('/') && !commandName.startsWith('cd/') && !/^[a-z]:\//i.test(commandName)) {
+    const slashIdx = commandName.indexOf('/');
+    const actualCmd = commandName.substring(0, slashIdx);
+    const attachedPart = commandName.substring(slashIdx);
+    commandName = actualCmd;
+    const attachedSwitches = attachedPart.split(/(?=\/)/).filter(Boolean);
+    restTokens = [...attachedSwitches, ...restTokens];
+  }
+
   // Handle cd.. and cd\ and cd/ special cases (CMD allows them without space)
   if (commandName.startsWith('cd.') || commandName.startsWith('cd\\') || commandName.startsWith('cd/')) {
     const remaining = commandName.substring(2); // take the part after 'cd'
@@ -70,6 +80,18 @@ export function parseCommandLine(line: string): ParsedCommand {
     restTokens = [commandName, ...restTokens];
     commandName = 'cd';
   }
+
+  // Expand any tokens with chained switches, e.g. "/w/p" -> ["/w", "/p"]
+  const expandedTokens: string[] = [];
+  for (const token of restTokens) {
+    if (token.startsWith('/') && token.indexOf('/', 1) !== -1) {
+      const parts = token.split(/(?=\/)/).filter(Boolean);
+      expandedTokens.push(...parts);
+    } else {
+      expandedTokens.push(token);
+    }
+  }
+  restTokens = expandedTokens;
 
   const positional: string[] = [];
   const flags: Record<string, string | boolean> = {};

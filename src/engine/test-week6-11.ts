@@ -189,15 +189,30 @@ export function runWeek6To11Verification(): Week6To11VerificationOutput {
   // 8.2 Interactive Diskpart Subsystem (b)
   const cmdDiskpartList = executeCmdCommand('diskpart list disk', context);
   const cmdDiskpartVol = executeCmdCommand('diskpart list volume', context);
+  const cmdDirectListDisk = executeCmdCommand('list disk', context);
+  const cmdDirectListVol = executeCmdCommand('list volume', context);
+  const psListDisk = ps.execute('list disk', context);
+  const psListVol = ps.execute('list volume', context);
   results.push({
     week: 8,
     topic: 'DiskPart Partition & Volume Geometry',
-    command: 'diskpart list disk',
+    command: 'diskpart list disk, list disk, list volume',
     call: '(b)',
     classification: 'Live-State Simulation',
-    stateCheckDescription: 'Reads context.disks and context.volumes dynamically',
-    passed: !cmdDiskpartList.error && cmdDiskpartList.text.includes('Disk 0') && cmdDiskpartVol.text.includes('Volume 0'),
-    notes: 'Live disk geometry from context.disks and context.volumes',
+    stateCheckDescription: 'Reads context.disks and context.volumes dynamically directly and via diskpart',
+    passed:
+      !cmdDiskpartList.error &&
+      cmdDiskpartList.text.includes('Disk 0') &&
+      cmdDiskpartVol.text.includes('Volume 0') &&
+      !cmdDirectListDisk.error &&
+      cmdDirectListDisk.text.includes('Disk 0') &&
+      !cmdDirectListVol.error &&
+      cmdDirectListVol.text.includes('Volume 0') &&
+      !psListDisk.error &&
+      psListDisk.text.includes('NVMe') &&
+      !psListVol.error &&
+      psListVol.text.includes('Fixed'),
+    notes: 'Live disk geometry from context.disks and context.volumes in both CMD and PowerShell',
   });
 
   // 8.3 Volume Format (b)

@@ -226,68 +226,216 @@ export const netshCommand: CommandHandler = (args, flags, switches, context) => 
 // ============================================================================
 // Week 8: Disk Partitioning (diskpart)
 // ============================================================================
-export const diskpartCommand: CommandHandler = (args, flags, switches, context) => {
-  const line = args.join(' ').toLowerCase();
+export const diskpartCommand: CommandHandler = (args, flags, switches, context, rawLine = '') => {
+  let line = (rawLine || args.join(' ')).trim();
+  const lowerLine = line.toLowerCase();
+  
+  // Strip leading "diskpart" if invoked as "diskpart list disk" or similar
+  let cleanLine = lowerLine;
+  if (cleanLine.startsWith('diskpart')) {
+    cleanLine = cleanLine.substring(8).trim();
+  }
 
-  // If called interactively or with sub-commands
-  if (line.includes('list disk')) {
+  // 1. Entering diskpart with no arguments
+  if (!cleanLine) {
+    context.inDiskPart = context.activeShell;
+    const banner = [
+      'Microsoft DiskPart version 10.0.19041.3636\n',
+      'Copyright (C) Microsoft Corporation.',
+      'On computer: ' + context.computerName + '\n',
+    ];
+    return { error: false, text: banner.join('\n') };
+  }
+
+  // 2. Exit / Quit
+  if (cleanLine === 'exit' || cleanLine === 'quit') {
+    context.inDiskPart = false;
+    return { error: false, text: 'Leaving DiskPart...' };
+  }
+
+  // 3. Help / ?
+  if (cleanLine === 'help' || cleanLine === '?' || cleanLine.startsWith('help ')) {
+    const helpLines = [
+      'Microsoft DiskPart version 10.0.19041.3636',
+      '',
+      '  ACTIVE      - Mark the selected partition as active.',
+      '  ASSIGN      - Assign a drive letter or mount point to the selected volume.',
+      '  CLEAN       - Clear the configuration information, or all information, off the disk.',
+      '  CONVERT     - Convert between different disk formats (MBR/GPT).',
+      '  CREATE      - Create a volume, partition, or virtual disk.',
+      '  DELETE      - Delete an object.',
+      '  DETAIL      - Provide details about an object (disk, volume, partition).',
+      '  EXIT        - Exit DiskPart.',
+      '  EXTEND      - Extend a volume.',
+      '  FORMAT      - Format the volume or partition.',
+      '  HELP        - Prints a list of commands.',
+      '  LIST        - Display a list of objects (disk, volume, partition, vdisk).',
+      '  REMOVE      - Remove a drive letter or mount point assignment.',
+      '  RESCAN      - Rescan the computer looking for disks and volumes.',
+      '  SELECT      - Shift the focus to an object.',
+      '  SET         - Change attributes or ID of the selected object.',
+      '  SHRINK      - Reduce the size of the selected volume.',
+    ];
+    return { error: false, text: helpLines.join('\n') };
+  }
+
+  // 4. Rescan
+  if (cleanLine === 'rescan') {
+    return {
+      error: false,
+      text: 'Please wait while DiskPart scans your configuration...\n\nDiskPart has finished scanning your configuration.',
+    };
+  }
+
+  // 5. LIST Commands
+  // list disk
+  if (cleanLine.startsWith('list disk') || cleanLine === 'disk') {
     const lines = [
       '  Disk ###  Status         Size     Free     Dyn  Gpt',
       '  --------  -------------  -------  -------  ---  ---',
     ];
     for (const d of context.disks) {
-      const num = d.diskNum.toString().padStart(8, ' ');
+      const diskLabel = `Disk ${d.diskNum}`.padEnd(8, ' ');
       const stat = d.status.padEnd(13, ' ');
       const sz = `${d.sizeGB} GB`.padStart(7, ' ');
       const fr = `${d.freeGB} GB`.padStart(7, ' ');
       const dyn = d.dyn ? ' * ' : '   ';
       const gpt = d.gpt ? ' * ' : '   ';
       const sel = d.diskNum === context.selectedDiskIndex ? '*' : ' ';
-      lines.push(`${sel} Disk ${num}  ${stat}  ${sz}  ${fr}  ${dyn}  ${gpt}`);
+      lines.push(`${sel} ${diskLabel}  ${stat}  ${sz}  ${fr}  ${dyn}  ${gpt}`);
     }
     return { error: false, text: lines.join('\n') };
   }
 
-  if (line.includes('list volume') || line.includes('list vol')) {
+  // list volume / list vol
+  if (cleanLine.startsWith('list vol') || cleanLine === 'volume' || cleanLine === 'vol') {
     const lines = [
       '  Volume ###  Ltr  Label        Fs     Type        Size     Status     Info',
       '  ----------  ---  -----------  -----  ----------  -------  ---------  --------',
     ];
     for (const v of context.volumes) {
-      const num = v.volNum.toString().padStart(10, ' ');
+      const volLabel = `Volume ${v.volNum}`.padEnd(10, ' ');
       const ltr = (v.letter ? `${v.letter} ` : '   ').padEnd(3, ' ');
       const lbl = v.label.padEnd(11, ' ');
       const fs = v.fs.padEnd(5, ' ');
       const typ = v.type.padEnd(10, ' ');
       const sz = `${v.sizeGB} GB`.padStart(7, ' ');
       const st = v.status.padEnd(9, ' ');
-      const inf = v.info;
-      lines.push(`  Volume ${num}  ${ltr}  ${lbl}  ${fs}  ${typ}  ${sz}  ${st}  ${inf}`);
+      const sel = v.volNum === context.selectedVolumeIndex ? '*' : ' ';
+      lines.push(`${sel} ${volLabel}  ${ltr}  ${lbl}  ${fs}  ${typ}  ${sz}  ${st}  ${v.info}`);
     }
     return { error: false, text: lines.join('\n') };
   }
 
-  if (line.includes('select disk')) {
-    const match = line.match(/select disk\s+(\d+)/);
-    const targetDisk = match ? parseInt(match[1], 10) : 0;
+  // list partition / list part
+  if (cleanLine.startsWith('list part') || cleanLine === 'partition' || cleanLine === 'part') {
+    const cur = context.disks.find((d) => d.diskNum === context.selectedDiskIndex) || context.disks[0];
+    if (!cur || !cur.partitions || cur.partitions.length === 0) {
+      return { error: false, text: 'There are no partitions on this disk to show.' };
+    }
+    const lines = [
+      '  Partition ###  Type              Size     Offset',
+      '  -------------  ----------------  -------  -------',
+    ];
+    for (const p of cur.partitions) {
+      const partLabel = `Partition ${p.partNum}`.padEnd(13, ' ');
+      const typ = p.type.padEnd(16, ' ');
+      const sz = `${p.sizeGB} GB`.padStart(7, ' ');
+      const off = `${Math.round(p.offsetKB / 1024)} MB`.padStart(7, ' ');
+      const sel = p.partNum === context.selectedPartitionIndex ? '*' : ' ';
+      lines.push(`${sel} ${partLabel}  ${typ}  ${sz}  ${off}`);
+    }
+    return { error: false, text: lines.join('\n') };
+  }
+
+  // list vdisk
+  if (cleanLine.startsWith('list vdisk')) {
+    return { error: false, text: 'There are no virtual disks to show.' };
+  }
+
+  // list alone
+  if (cleanLine === 'list') {
+    const helpLines = [
+      'Microsoft DiskPart version 10.0.19041.3636',
+      '',
+      'Available LIST commands:',
+      '  LIST DISK        - Display a list of disks.',
+      '  LIST VOLUME      - Display a list of volumes.',
+      '  LIST PARTITION   - Display a list of partitions on the selected disk.',
+      '  LIST VDISK       - Displays a list of virtual disks.',
+    ];
+    return { error: false, text: helpLines.join('\n') };
+  }
+
+  // 6. SELECT Commands
+  // select disk <n>
+  if (cleanLine.startsWith('select disk') || cleanLine.startsWith('sel disk')) {
+    const match = cleanLine.match(/disk\s+(\d+)/);
+    if (!match) return { error: true, text: 'The disk you specified is not valid.' };
+    const targetDisk = parseInt(match[1], 10);
     if (context.disks.some((d) => d.diskNum === targetDisk)) {
       context.selectedDiskIndex = targetDisk;
+      // Reset selected partition to 1 if present
+      const cur = context.disks.find((d) => d.diskNum === targetDisk);
+      if (cur && cur.partitions.length > 0) {
+        context.selectedPartitionIndex = cur.partitions[0].partNum;
+      }
       return { error: false, text: `Disk ${targetDisk} is now the selected disk.` };
     }
     return { error: true, text: 'The disk you specified is not valid.' };
   }
 
-  if (line.includes('detail disk')) {
+  // select volume <n | letter> (e.g. select volume C, select volume 0)
+  if (cleanLine.startsWith('select vol') || cleanLine.startsWith('sel vol')) {
+    const letterMatch = cleanLine.match(/vol(ume)?\s+([a-zA-Z]):?$/);
+    const numMatch = cleanLine.match(/vol(ume)?\s+(\d+)$/);
+    if (letterMatch && isNaN(Number(letterMatch[2]))) {
+      const targetLetter = letterMatch[2].toUpperCase();
+      const found = context.volumes.find((v) => v.letter.toUpperCase() === targetLetter);
+      if (found) {
+        context.selectedVolumeIndex = found.volNum;
+        return { error: false, text: `Volume ${found.volNum} is now the selected volume.` };
+      }
+      return { error: true, text: `The volume with drive letter ${targetLetter} was not found.` };
+    }
+    if (numMatch) {
+      const targetVol = parseInt(numMatch[2], 10);
+      if (context.volumes.some((v) => v.volNum === targetVol)) {
+        context.selectedVolumeIndex = targetVol;
+        return { error: false, text: `Volume ${targetVol} is now the selected volume.` };
+      }
+      return { error: true, text: 'The volume you specified is not valid.' };
+    }
+    return { error: true, text: 'The arguments specified for this command are not valid.' };
+  }
+
+  // select partition <n>
+  if (cleanLine.startsWith('select part') || cleanLine.startsWith('sel part')) {
+    const match = cleanLine.match(/part(ition)?\s+(\d+)/);
+    if (!match) return { error: true, text: 'The partition you specified is not valid.' };
+    const targetPart = parseInt(match[2], 10);
+    const cur = context.disks.find((d) => d.diskNum === context.selectedDiskIndex);
+    if (cur && cur.partitions.some((p) => p.partNum === targetPart)) {
+      context.selectedPartitionIndex = targetPart;
+      return { error: false, text: `Partition ${targetPart} is now the selected partition.` };
+    }
+    return { error: true, text: 'The partition you specified is not valid.\nThere is no partition selected.' };
+  }
+
+  // 7. DETAIL Commands
+  // detail disk
+  if (cleanLine.startsWith('detail disk')) {
     const cur = context.disks.find((d) => d.diskNum === context.selectedDiskIndex) || context.disks[0];
+    const isUSB = cur.diskNum === 1;
     const lines = [
-      `SAMSUNG MZVLB256HAHQ-00000`,
-      `Disk ID: {8E1A43F1-2B44-4A2B-8C21-7A39820B1D4F}`,
-      `Type   : NVMe`,
+      isUSB ? 'SanDisk Ultra USB 3.0 Device' : 'SAMSUNG MZVLB256HAHQ-00000',
+      `Disk ID: {${isUSB ? '9C1284E1-44B2-4A2B-8C21-884910248102' : '8E1A43F1-2B44-4A2B-8C21-7A39820B1D4F'}}`,
+      `Type   : ${isUSB ? 'USB' : 'NVMe'}`,
       `Status : ${cur.status}`,
       `Path   : 0`,
-      `Target : 0`,
+      `Target : ${cur.diskNum}`,
       `LUN ID : 0`,
-      `Location Path : PCIROOT(0)#PCI(0E00)#NVME(0001)`,
+      `Location Path : ${isUSB ? 'PCIROOT(0)#PCI(1400)#USB(1)' : 'PCIROOT(0)#PCI(0E00)#NVME(0001)'}`,
       `Current Read-only State : No`,
       `Read-only  : No`,
       `Boot Disk  : ${cur.diskNum === 0 ? 'Yes' : 'No'}`,
@@ -309,34 +457,262 @@ export const diskpartCommand: CommandHandler = (args, flags, switches, context) 
     return { error: false, text: lines.join('\n') };
   }
 
-  if (line.includes('list partition') || line.includes('list part')) {
-    const cur = context.disks.find((d) => d.diskNum === context.selectedDiskIndex) || context.disks[0];
+  // detail partition
+  if (cleanLine.startsWith('detail part')) {
+    const curDisk = context.disks.find((d) => d.diskNum === context.selectedDiskIndex) || context.disks[0];
+    const curPart = curDisk.partitions.find((p) => p.partNum === context.selectedPartitionIndex) || curDisk.partitions[0];
+    if (!curPart) {
+      return { error: true, text: 'There is no partition selected.\nPlease select a partition and try again.' };
+    }
     const lines = [
-      '  Partition ###  Type              Size     Offset',
-      '  -------------  ----------------  -------  -------',
+      `Partition ${curPart.partNum}`,
+      `Type  : ${curPart.type === 'Primary' ? '07' : '05'}`,
+      `Hidden: No`,
+      `Active: ${curPart.partNum === 1 ? 'Yes' : 'No'}`,
+      `Offset in Bytes: ${curPart.offsetKB * 1024}`,
+      '',
+      '  Volume ###  Ltr  Label        Fs     Type        Size     Status     Info',
+      '  ----------  ---  -----------  -----  ----------  -------  ---------  --------',
     ];
-    for (const p of cur.partitions) {
-      const num = p.partNum.toString().padStart(13, ' ');
-      const typ = p.type.padEnd(16, ' ');
-      const sz = `${p.sizeGB} GB`.padStart(7, ' ');
-      const off = `${Math.round(p.offsetKB / 1024)} MB`.padStart(7, ' ');
-      lines.push(`  Partition ${num}  ${typ}  ${sz}  ${off}`);
+    const matchVol = context.volumes.find((v) => v.volNum === context.selectedVolumeIndex) || context.volumes[0];
+    if (matchVol) {
+      const num = matchVol.volNum.toString().padStart(10, ' ');
+      const ltr = (matchVol.letter ? `${matchVol.letter} ` : '   ').padEnd(3, ' ');
+      const lbl = matchVol.label.padEnd(11, ' ');
+      const fs = matchVol.fs.padEnd(5, ' ');
+      const typ = matchVol.type.padEnd(10, ' ');
+      const sz = `${curPart.sizeGB} GB`.padStart(7, ' ');
+      const st = matchVol.status.padEnd(9, ' ');
+      lines.push(`* Volume ${num}  ${ltr}  ${lbl}  ${fs}  ${typ}  ${sz}  ${st}  ${matchVol.info}`);
     }
     return { error: false, text: lines.join('\n') };
   }
 
-  // Default interactive banner
-  const banner = [
-    'Microsoft DiskPart version 10.0.19041.3636',
-    '',
-    'Copyright (C) Microsoft Corporation.',
-    'On computer: ' + context.computerName,
-    '',
-    'DISKPART> Type "list disk" or "list volume" to view storage geometry.',
-    'DISKPART> Type "select disk <n>" or "detail disk" to examine partitions.',
-    'DISKPART> Use "exit" to leave DiskPart.',
-  ];
-  return { error: false, text: banner.join('\n') };
+  // detail volume
+  if (cleanLine.startsWith('detail vol')) {
+    const cur = context.volumes.find((v) => v.volNum === context.selectedVolumeIndex) || context.volumes[0];
+    const lines = [
+      `Volume ID: {A79D20F1-0000-0000-0000-${String(cur.volNum).padStart(12, '0')}}`,
+      `Type        : ${cur.type}`,
+      `Status      : ${cur.status}`,
+      `File System : ${cur.fs}`,
+      `Size        : ${cur.sizeGB} GB`,
+      `Free Space  : ${Math.round(cur.sizeGB * 0.7)} GB`,
+      `Label       : ${cur.label}`,
+      `Read-only   : No`,
+    ];
+    return { error: false, text: lines.join('\n') };
+  }
+
+  // 8. DISK MANAGEMENT: CLEAN and CLEAN ALL
+  if (cleanLine === 'clean' || cleanLine === 'clean all') {
+    const curDisk = context.disks.find((d) => d.diskNum === context.selectedDiskIndex);
+    if (!curDisk) {
+      return { error: true, text: 'There is no disk selected.\nPlease select a disk and try again.' };
+    }
+    curDisk.partitions = [];
+    curDisk.freeGB = curDisk.sizeGB;
+    // If cleaning disk 1 (USB) or secondary, remove associated volume if exists
+    if (curDisk.diskNum !== 0) {
+      context.volumes = context.volumes.filter((v) => v.type !== 'Removable');
+    }
+    return { error: false, text: 'DiskPart succeeded in cleaning the disk.' };
+  }
+
+  // 9. CONVERT MBR / CONVERT GPT
+  if (cleanLine === 'convert mbr') {
+    const curDisk = context.disks.find((d) => d.diskNum === context.selectedDiskIndex);
+    if (!curDisk) return { error: true, text: 'There is no disk selected.' };
+    curDisk.gpt = false;
+    return { error: false, text: 'DiskPart successfully converted the selected disk to MBR format.' };
+  }
+
+  if (cleanLine === 'convert gpt') {
+    const curDisk = context.disks.find((d) => d.diskNum === context.selectedDiskIndex);
+    if (!curDisk) return { error: true, text: 'There is no disk selected.' };
+    curDisk.gpt = true;
+    return { error: false, text: 'DiskPart successfully converted the selected disk to GPT format.' };
+  }
+
+  // 10. PARTITION CREATION: CREATE PARTITION PRIMARY / EXTENDED / LOGICAL
+  if (cleanLine.startsWith('create part') || cleanLine.startsWith('create partition')) {
+    const curDisk = context.disks.find((d) => d.diskNum === context.selectedDiskIndex);
+    if (!curDisk) return { error: true, text: 'There is no disk selected.' };
+
+    const isExtended = cleanLine.includes('extended');
+    const isLogical = cleanLine.includes('logical');
+    const partType = isExtended ? 'Extended' : isLogical ? 'Logical' : 'Primary';
+
+    // Parse size if specified: size=50000 (in MB)
+    const sizeMatch = cleanLine.match(/size=(\d+)/);
+    let sizeGB = 0;
+    if (sizeMatch) {
+      const sizeMB = parseInt(sizeMatch[1], 10);
+      sizeGB = Math.max(1, Math.round(sizeMB / 1024));
+    } else {
+      // Default to remaining free space or 10GB
+      sizeGB = Math.max(1, curDisk.freeGB || 10);
+    }
+
+    const nextPartNum = curDisk.partitions.length > 0 ? Math.max(...curDisk.partitions.map((p) => p.partNum)) + 1 : 1;
+    const nextOffsetKB = curDisk.partitions.length > 0 ? curDisk.partitions[curDisk.partitions.length - 1].offsetKB + 1048576 : 1024;
+
+    curDisk.partitions.push({
+      partNum: nextPartNum,
+      type: partType,
+      sizeGB,
+      offsetKB: nextOffsetKB,
+    });
+
+    curDisk.freeGB = Math.max(0, curDisk.freeGB - sizeGB);
+    context.selectedPartitionIndex = nextPartNum;
+
+    return { error: false, text: 'DiskPart succeeded in creating the specified partition.' };
+  }
+
+  // 11. DELETE PARTITION
+  if (cleanLine.startsWith('delete part') || cleanLine.startsWith('del part')) {
+    const curDisk = context.disks.find((d) => d.diskNum === context.selectedDiskIndex);
+    if (!curDisk) return { error: true, text: 'There is no disk selected.' };
+
+    const idx = curDisk.partitions.findIndex((p) => p.partNum === context.selectedPartitionIndex);
+    if (idx === -1) {
+      return { error: true, text: 'No partition is selected to delete.' };
+    }
+    const freed = curDisk.partitions[idx].sizeGB;
+    curDisk.partitions.splice(idx, 1);
+    curDisk.freeGB += freed;
+    if (curDisk.partitions.length > 0) {
+      context.selectedPartitionIndex = curDisk.partitions[0].partNum;
+    }
+    return { error: false, text: 'DiskPart successfully deleted the selected partition.' };
+  }
+
+  // 12. ACTIVE
+  if (cleanLine === 'active') {
+    return { error: false, text: 'DiskPart marked the current partition as active.' };
+  }
+
+  // 13. FORMAT: format fs=ntfs label="Data" quick
+  if (cleanLine.startsWith('format')) {
+    const curDisk = context.disks.find((d) => d.diskNum === context.selectedDiskIndex) || context.disks[0];
+    const curPart = curDisk.partitions.find((p) => p.partNum === context.selectedPartitionIndex);
+
+    // Extract fs
+    const fsMatch = cleanLine.match(/fs=([a-z0-9]+)/i);
+    let fs = 'NTFS';
+    if (fsMatch) {
+      const matched = fsMatch[1].toUpperCase();
+      if (matched === 'FAT32') fs = 'FAT32';
+      else if (matched === 'EXFAT') fs = 'exFAT';
+      else fs = 'NTFS';
+    }
+
+    // Extract label
+    const labelMatch = cleanLine.match(/label="?([^"\s]+)"?/i);
+    const label = labelMatch ? labelMatch[1] : 'New Volume';
+
+    // Find volume or assign to current volume
+    let targetVol = context.volumes.find((v) => v.volNum === context.selectedVolumeIndex);
+    if (!targetVol && curPart) {
+      const nextVolNum = context.volumes.length > 0 ? Math.max(...context.volumes.map((v) => v.volNum)) + 1 : 0;
+      targetVol = {
+        volNum: nextVolNum,
+        letter: '',
+        label,
+        fs: fs as any,
+        type: curDisk.diskNum === 1 ? 'Removable' : 'Partition',
+        sizeGB: curPart.sizeGB,
+        status: 'Healthy',
+        info: '',
+      };
+      context.volumes.push(targetVol);
+      context.selectedVolumeIndex = nextVolNum;
+    } else if (targetVol) {
+      targetVol.fs = fs as any;
+      targetVol.label = label;
+    }
+
+    return {
+      error: false,
+      text: '  100 percent completed\n\nDiskPart successfully formatted the volume.',
+    };
+  }
+
+  // 14. SHRINK: shrink desired=20000
+  if (cleanLine.startsWith('shrink')) {
+    const match = cleanLine.match(/desired=(\d+)/);
+    const desiredMB = match ? parseInt(match[1], 10) : 10240;
+    const shrinkGB = Math.max(1, Math.round(desiredMB / 1024));
+
+    const curVol = context.volumes.find((v) => v.volNum === context.selectedVolumeIndex) || context.volumes[0];
+    const curDisk = context.disks.find((d) => d.diskNum === context.selectedDiskIndex) || context.disks[0];
+
+    curVol.sizeGB = Math.max(1, curVol.sizeGB - shrinkGB);
+    curDisk.freeGB += shrinkGB;
+
+    return {
+      error: false,
+      text: `DiskPart successfully shrunk the volume by: ${shrinkGB} GB.`,
+    };
+  }
+
+  // 15. EXTEND: extend size=10000
+  if (cleanLine.startsWith('extend')) {
+    const match = cleanLine.match(/size=(\d+)/);
+    const sizeMB = match ? parseInt(match[1], 10) : 10240;
+    const extendGB = Math.max(1, Math.round(sizeMB / 1024));
+
+    const curVol = context.volumes.find((v) => v.volNum === context.selectedVolumeIndex) || context.volumes[0];
+    const curDisk = context.disks.find((d) => d.diskNum === context.selectedDiskIndex) || context.disks[0];
+
+    const actualExtend = Math.min(extendGB, curDisk.freeGB || extendGB);
+    curVol.sizeGB += actualExtend;
+    curDisk.freeGB = Math.max(0, curDisk.freeGB - actualExtend);
+
+    return {
+      error: false,
+      text: 'DiskPart successfully extended the volume.',
+    };
+  }
+
+  // 16. ASSIGN [letter=D]
+  if (cleanLine.startsWith('assign')) {
+    const curVol = context.volumes.find((v) => v.volNum === context.selectedVolumeIndex) || context.volumes[context.volumes.length - 1];
+    if (!curVol) {
+      return { error: true, text: 'There is no volume selected.\nPlease select a volume and try again.' };
+    }
+    const letterMatch = cleanLine.match(/letter=([a-z])/i);
+    if (letterMatch) {
+      curVol.letter = letterMatch[1].toUpperCase();
+    } else {
+      // Pick next available drive letter
+      const usedLetters = new Set(context.volumes.map((v) => v.letter.toUpperCase()).filter(Boolean));
+      const alphabet = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+      const nextLetter = alphabet.find((l) => !usedLetters.has(l)) || 'E';
+      curVol.letter = nextLetter;
+    }
+    return { error: false, text: 'DiskPart successfully assigned the drive letter or mount point.' };
+  }
+
+  // 17. REMOVE [letter=D]
+  if (cleanLine.startsWith('remove')) {
+    const curVol = context.volumes.find((v) => v.volNum === context.selectedVolumeIndex) || context.volumes[0];
+    if (curVol) {
+      curVol.letter = '';
+    }
+    return { error: false, text: 'DiskPart successfully removed the drive letter or mount point.' };
+  }
+
+  // 18. SET ID=07
+  if (cleanLine.startsWith('set id=')) {
+    return { error: false, text: 'DiskPart successfully set the partition ID.' };
+  }
+
+  return {
+    error: true,
+    text: `The arguments specified for this command are not valid.\nFor more information on the command type: HELP ${cleanLine.split(' ')[0].toUpperCase()}`,
+  };
 };
 
 // ============================================================================
@@ -534,8 +910,8 @@ export const bcdeditCommand: CommandHandler = (args, flags, switches, context) =
 // ============================================================================
 // Week 9: Deployment Image Servicing and Management (dism)
 // ============================================================================
-export const dismCommand: CommandHandler = (args, flags, switches, context) => {
-  const line = args.join(' ').toLowerCase();
+export const dismCommand: CommandHandler = (args, flags, switches, context, rawLine = '') => {
+  const line = (rawLine || args.join(' ') + ' ' + switches.join(' ')).toLowerCase();
 
   if (line.includes('cleanup-image') && (line.includes('scanhealth') || line.includes('restorehealth'))) {
     const lines = [

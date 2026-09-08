@@ -70,8 +70,18 @@ export function tokenizeStage(stageStr: string): ParsedStage {
   let cmdlet = tokens[0] || '';
   let remaining = tokens.slice(1);
 
-  // Handle cd.. and cd\ and cd/ special cases (PowerShell allows some without space)
+  // Handle attached switches in cmdlet, e.g. "ipconfig/all"
   const lowerCmdlet = cmdlet.toLowerCase();
+  if (lowerCmdlet.includes('/') && !lowerCmdlet.startsWith('cd/') && !/^[a-z]:\//i.test(lowerCmdlet)) {
+    const slashIdx = cmdlet.indexOf('/');
+    const actualCmd = cmdlet.substring(0, slashIdx);
+    const attachedPart = cmdlet.substring(slashIdx);
+    cmdlet = actualCmd;
+    const attachedSwitches = attachedPart.split(/(?=\/)/).filter(Boolean);
+    remaining = [...attachedSwitches, ...remaining];
+  }
+
+  // Handle cd.. and cd\ and cd/ special cases (PowerShell allows some without space)
   if (lowerCmdlet.startsWith('cd.') || lowerCmdlet.startsWith('cd\\') || lowerCmdlet.startsWith('cd/')) {
     const part = cmdlet.substring(2);
     cmdlet = 'cd';
@@ -93,19 +103,20 @@ export function tokenizeStage(stageStr: string): ParsedStage {
       continue;
     }
 
-    if (t.startsWith('-')) {
-      const paramName = t.slice(1);
-      // Check if next token is a value (and not another parameter starting with -)
+    if (t.startsWith('-') || t.startsWith('/')) {
+      const paramName = t.replace(/^[-/]+/, '');
+      // Check if next token is a value (and not another parameter starting with - or /)
       const nextToken = remaining[idx + 1];
       if (
         nextToken !== undefined &&
         !nextToken.startsWith('-') &&
+        !nextToken.startsWith('/') &&
         !(nextToken.startsWith('{') && nextToken.endsWith('}'))
       ) {
         named[paramName.toLowerCase()] = nextToken;
         idx += 2;
       } else {
-        // Boolean switch like -Descending or -Recurse
+        // Boolean switch like -Descending, -Recurse, or /all
         named[paramName.toLowerCase()] = true;
         idx++;
       }

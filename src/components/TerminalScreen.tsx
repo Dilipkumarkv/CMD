@@ -17,31 +17,46 @@ interface TerminalScreenProps {
 
 function StreamedOutput({ content }: { content: string }) {
   const [displayed, setDisplayed] = useState('');
+  const [isTyping, setIsTyping] = useState(true);
 
   useEffect(() => {
-    // If output is relatively short, display instantly
-    if (content.length < 500) {
-      setDisplayed(content);
+    if (!content) {
+      setDisplayed('');
+      setIsTyping(false);
       return;
     }
 
+    setIsTyping(true);
     let i = 0;
-    const chunkSize = Math.max(150, Math.floor(content.length / 10)); // Stream over ~10 frames or 150 chars/tick
-    
+    // Calculate chunk size for typing speed. 
+    // Aim to complete within ~400-600ms to avoid forcing the user to wait too long.
+    const charsPerFrame = Math.max(1, Math.ceil(content.length / 30));
+
     const interval = setInterval(() => {
-      i += chunkSize;
+      i += charsPerFrame;
       if (i >= content.length) {
         setDisplayed(content);
+        setIsTyping(false);
         clearInterval(interval);
       } else {
         setDisplayed(content.slice(0, i));
+      }
+      // Auto-scroll while typing
+      const viewport = document.getElementById('terminal-scroll-area');
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
       }
     }, 16);
 
     return () => clearInterval(interval);
   }, [content]);
 
-  return <>{displayed}</>;
+  return (
+    <>
+      {displayed}
+      {isTyping && <span className="inline-block w-2 h-3.5 align-middle bg-current opacity-70 ml-px" />}
+    </>
+  );
 }
 
 export function TerminalScreen({
@@ -98,7 +113,7 @@ export function TerminalScreen({
           title="Tap to reuse this command"
         >
           <span className={`font-semibold whitespace-nowrap ${isEntryPS ? 'text-sky-300' : 'text-neutral-400'}`}>
-            {entry.prompt || (isEntryPS ? `PS ${currentPrompt}>` : `${currentPrompt}>`)}
+            {entry.prompt || currentPrompt}
           </span>
           <span className={`font-bold flex-1 ${!terminalColors?.fg ? (isEntryPS ? 'text-white' : 'text-emerald-300') : ''}`}>
             {entry.commandText}
@@ -159,7 +174,7 @@ export function TerminalScreen({
         
         <form onSubmit={onSubmit} className="flex items-baseline gap-1.5 pl-1 py-4 mt-2 w-full cursor-text" onClick={() => document.getElementById('terminal-input')?.focus()}>
           <span className={`font-semibold whitespace-nowrap ${isPS ? 'text-sky-300' : 'text-neutral-400'}`}>
-            {isPS ? `PS ${currentPrompt}>` : `${currentPrompt}>`}
+            {currentPrompt}
           </span>
           <input
             id="terminal-input"

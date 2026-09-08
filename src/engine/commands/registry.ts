@@ -105,6 +105,9 @@ export const defaultRegistry: CommandRegistry = {
   arp: arpCommand,
   netsh: netshCommand,
   diskpart: diskpartCommand,
+  list: diskpartCommand,
+  select: diskpartCommand,
+  detail: diskpartCommand,
   format: formatCommand,
   driverquery: driverqueryCommand,
   sc: scCommand,
@@ -157,6 +160,14 @@ export function executeCommand(
 
   if (!parsed.commandName) {
     return { error: false, text: '' };
+  }
+
+  if (context.inDiskPart === 'cmd') {
+    try {
+      return diskpartCommand(parsed.positional, parsed.flags, parsed.switches, context, lineToRun);
+    } catch (e: any) {
+      return { error: true, text: `Diskpart encountered an error: ${e.message}` };
+    }
   }
 
   const handler = customRegistry[parsed.commandName];

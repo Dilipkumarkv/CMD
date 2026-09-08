@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { FormEvent, useCallback, useEffect, useState, KeyboardEvent } from 'react';
+import { FormEvent, useCallback, useEffect, useState, useRef, KeyboardEvent } from 'react';
 import { CommandInputBar } from './components/CommandInputBar';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PWAInstallPromptBanner } from './components/PWAInstallPromptBanner';
@@ -24,7 +24,13 @@ export default function App() {
     return loadLabState() || new LabContext();
   });
   const [shellMode, setShellMode] = useState<'cmd' | 'ps'>('cmd');
-  const [currentPrompt, setCurrentPrompt] = useState<string>(() => labContext.vfs.getCwd());
+  const getPromptString = (context: LabContext, shell: 'cmd' | 'ps') => {
+    if (context.inDiskPart === shell) return 'DISKPART>';
+    const cwd = context.vfs.getCwd();
+    return shell === 'ps' ? `PS ${cwd}>` : `${cwd}>`;
+  };
+
+  const [currentPrompt, setCurrentPrompt] = useState<string>(() => getPromptString(labContext, 'cmd'));
 
   // Input & Command History
   const [cmdInput, setCmdInput] = useState<string>('');
@@ -34,6 +40,127 @@ export default function App() {
   // Modals / Drawers
   const [isResetModalOpen, setIsResetModalOpen] = useState<boolean>(false);
   const [isCommandGuideOpen, setIsCommandGuideOpen] = useState<boolean>(false);
+
+  const isCommandGuideOpenRef = useRef<boolean>(isCommandGuideOpen);
+  const isResetModalOpenRef = useRef<boolean>(isResetModalOpen);
+
+  useEffect(() => {
+    isCommandGuideOpenRef.current = isCommandGuideOpen;
+  }, [isCommandGuideOpen]);
+
+  useEffect(() => {
+    isResetModalOpenRef.current = isResetModalOpen;
+  }, [isResetModalOpen]);
+
+  // Modal open/close handlers with history state synchronization
+  const handleOpenCommands = () => {
+    try {
+      window.history.pushState({ modal: 'commandGuide' }, '');
+    } catch {
+      // ignore
+    }
+    setIsCommandGuideOpen(true);
+  };
+
+  const handleCloseCommands = () => {
+    setIsCommandGuideOpen(false);
+    if (window.history.state?.modal === 'commandGuide') {
+      try {
+        window.history.replaceState({ app: 'terminal' }, '');
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const handleOpenReset = () => {
+    try {
+      window.history.pushState({ modal: 'reset' }, '');
+    } catch {
+      // ignore
+    }
+    setIsResetModalOpen(true);
+  };
+
+  const handleCloseReset = () => {
+    setIsResetModalOpen(false);
+    if (window.history.state?.modal === 'reset') {
+      try {
+        window.history.replaceState({ app: 'terminal' }, '');
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  // Back button and popstate management: prevents back button from closing entire page
+  useEffect(() => {
+    try {
+      window.history.replaceState({ app: 'terminal-root' }, '');
+      window.history.pushState({ app: 'terminal' }, '');
+    } catch {
+      // ignore
+    }
+
+    const onPopState = () => {
+      // If a modal is open, back button simply dismisses the modal
+      if (isCommandGuideOpenRef.current) {
+        setIsCommandGuideOpen(false);
+        return;
+      }
+      if (isResetModalOpenRef.current) {
+        setIsResetModalOpen(false);
+        return;
+      }
+
+      // If on main screen, re-push buffer so pressing Back never navigates away or closes page
+      try {
+        window.history.pushState({ app: 'terminal' }, '');
+      } catch {
+        // ignore
+      }
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+    };
+  }, []);
+
+  // Global key interception: prevent accidental Backspace-to-navigate-back and handle Escape
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Backspace') {
+        const activeEl = document.activeElement;
+        const tag = (activeEl?.tagName || '').toLowerCase();
+        const isEditable =
+          tag === 'input' ||
+          tag === 'textarea' ||
+          (activeEl as HTMLElement)?.isContentEditable;
+
+        if (!isEditable) {
+          e.preventDefault();
+          const termInput = document.getElementById('terminal-input') as HTMLInputElement | null;
+          if (termInput) {
+            termInput.focus();
+          }
+        }
+      }
+
+      if (e.key === 'Escape') {
+        if (isCommandGuideOpenRef.current) {
+          handleCloseCommands();
+        } else if (isResetModalOpenRef.current) {
+          handleCloseReset();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+    };
+  }, []);
 
   // Load history from session or local if needed (omitted for brevity, keeping existing initial states)
   const [entries, setEntries] = useState<TerminalEntry[]>([
@@ -62,8 +189,8 @@ export default function App() {
       if (!trimmed) return;
 
       const activeShell = explicitShell || shellMode;
-      const cwd = labContext.vfs.getCwd();
-      const promptStr = activeShell === 'ps' ? `PS ${cwd}>` : `${cwd}>`;
+      labContext.activeShell = activeShell;
+      const promptStr = getPromptString(labContext, activeShell);
 
       // Save to command history (avoid immediate duplicates)
       setCommandHistory((prev) => {
@@ -187,7 +314,7 @@ export default function App() {
         }
       }
 
-      setCurrentPrompt(labContext.vfs.getCwd());
+      setCurrentPrompt(getPromptString(labContext, shellMode));
       setCmdInput('');
     },
     [labContext, shellMode]
@@ -202,6 +329,7 @@ export default function App() {
   const handleSwitchMode = (newMode: 'cmd' | 'ps') => {
     if (newMode === shellMode) return;
     setShellMode(newMode);
+    setCurrentPrompt(getPromptString(labContext, newMode));
     const cwd = labContext.vfs.getCwd();
     setEntries((prev) => {
       // Filter out previous session active notifications to prevent stacking
@@ -251,6 +379,7 @@ export default function App() {
   };
 
   const handleSelectGuideCommand = (command: string, targetShell: 'cmd' | 'ps') => {
+    handleCloseCommands();
     if (targetShell !== shellMode) {
       handleSwitchMode(targetShell);
     }
@@ -289,6 +418,7 @@ export default function App() {
 
   // Reset entire Virtual Machine lab state
   const handleResetLab = () => {
+    handleCloseReset();
     clearLabState();
     const newContext = new LabContext();
     setLabContext(newContext);
@@ -336,8 +466,8 @@ export default function App() {
       <ShellHeader
         shellMode={shellMode}
         onSwitchMode={handleSwitchMode}
-        onOpenReset={() => setIsResetModalOpen(true)}
-        onOpenCommands={() => setIsCommandGuideOpen(true)}
+        onOpenReset={handleOpenReset}
+        onOpenCommands={handleOpenCommands}
       />
 
       {/* Dismissible First-Time PWA Install Prompt Banner */}
@@ -369,14 +499,14 @@ export default function App() {
       {/* Safe Reset Lab Confirmation Modal */}
       <ResetModal
         isOpen={isResetModalOpen}
-        onClose={() => setIsResetModalOpen(false)}
+        onClose={handleCloseReset}
         onConfirm={handleResetLab}
       />
 
       {/* Interactive Command Reference & Practice Guide Modal */}
       <CommandGuideModal
         isOpen={isCommandGuideOpen}
-        onClose={() => setIsCommandGuideOpen(false)}
+        onClose={handleCloseCommands}
         onSelectCommand={handleSelectGuideCommand}
         activeShell={shellMode}
       />

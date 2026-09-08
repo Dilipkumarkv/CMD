@@ -21,8 +21,8 @@ export function CommandInputBar({
   const isPS = shellMode === 'ps';
 
   const quickChips = isPS
-    ? ['Get-ChildItem', 'Get-Process', 'Get-Service', 'Clear-Host']
-    : ['dir', 'tasklist', 'ipconfig', 'cls'];
+    ? ['Get-ChildItem', 'ipconfig /all', 'Get-Process', 'Get-Service', 'Clear-Host']
+    : ['dir', 'ipconfig /all', 'tasklist', 'cls'];
 
   return (
     <div

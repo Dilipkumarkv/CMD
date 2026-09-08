@@ -1,4 +1,14 @@
-import { Check, Download, Share2, Smartphone, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Check,
+  Download,
+  HardDrive,
+  Laptop,
+  Share2,
+  ShieldCheck,
+  Smartphone,
+  X,
+} from 'lucide-react';
 import { MouseEvent, useState } from 'react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 
@@ -9,137 +19,233 @@ interface PWAInstallButtonProps {
 
 export function PWAInstallButton({ variant = 'header', shellMode = 'cmd' }: PWAInstallButtonProps) {
   const { isInstallable, isInstalled, isIOS, isDismissed, install, dismissPrompt } = usePWAInstall();
-  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [justInstalled, setJustInstalled] = useState(false);
+  const [activeTab, setActiveTab] = useState<'device' | 'desktop' | 'mobile'>('device');
   const isPS = shellMode === 'ps';
 
-  // If already installed, show clean status indicator
-  if (isInstalled || justInstalled) {
-    return (
-      <div
-        className="hidden md:flex items-center gap-1 px-2 py-1 rounded text-xs font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/40"
-        title="App is installed and running as a standalone PWA"
-      >
-        <Check className="w-3 h-3 text-emerald-400" />
-        <span className="text-[10px]">Installed PWA</span>
-      </div>
-    );
-  }
+  const isActuallyInstalled = isInstalled || justInstalled;
 
-  // If dismissed and in header, show a subtle icon or button that won't nag
   const handleInstallClick = async () => {
+    if (isActuallyInstalled) {
+      setShowModal(true);
+      return;
+    }
+
     if (isInstallable) {
       const accepted = await install();
       if (accepted) {
         setJustInstalled(true);
+        return;
       }
-    } else if (isIOS) {
-      setShowIOSGuide(true);
-    } else {
-      setShowIOSGuide(true);
     }
+    // If native prompt wasn't available or was already prompted, show the guided install modal
+    setShowModal(true);
   };
 
-  const handleCloseGuide = (e?: MouseEvent) => {
+  const handleCloseModal = (e?: MouseEvent) => {
     e?.stopPropagation();
-    setShowIOSGuide(false);
-    dismissPrompt();
+    setShowModal(false);
   };
 
   return (
     <>
-      <button
+      <motion.button
+        whileTap={{ scale: 0.95 }}
         type="button"
         id="pwa-install-btn"
         onClick={handleInstallClick}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all shadow-sm active:scale-95 ${
-          isDismissed
-            ? 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 border border-neutral-700'
-            : isPS
-            ? 'bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold shadow-sky-950'
-            : 'bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-semibold shadow-emerald-950'
+        className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors shadow-xs ${
+          isActuallyInstalled
+            ? 'bg-[#012456] hover:bg-[#01357d] text-sky-200 border border-sky-600/80'
+            : 'bg-[#012456] hover:bg-[#01357d] text-sky-100 border border-sky-500/80 hover:border-sky-400'
         }`}
-        title="Install SNA Terminal Lab for offline home screen / desktop access"
+        title={
+          isActuallyInstalled
+            ? 'SNA Terminal Lab is installed as a PWA (Click for offline status & details)'
+            : 'Install SNA Terminal Lab for offline home screen / desktop access'
+        }
+        aria-label={isActuallyInstalled ? 'App is installed' : 'Install SNA Terminal Lab'}
       >
-        <Download className="w-3.5 h-3.5" />
-        <span>Install</span>
-      </button>
+        {isActuallyInstalled ? (
+          <Check className="w-3.5 h-3.5 shrink-0 text-sky-400" />
+        ) : (
+          <Download className="w-3.5 h-3.5 shrink-0 text-sky-400" />
+        )}
+        <span className="hidden sm:inline font-medium">
+          {isActuallyInstalled ? 'Installed' : 'Install'}
+        </span>
+      </motion.button>
 
-      {/* Guided installation modal for iOS or manual install fallback */}
-      {showIOSGuide && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs"
-        >
-          <div className="w-full max-w-sm rounded-xl bg-neutral-900 border border-neutral-700 p-5 shadow-2xl text-neutral-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-sky-500/20 border border-sky-500/40 flex items-center justify-center">
-                  <Smartphone className="w-4 h-4 text-sky-400" />
+      {/* Interactive Modal: Guided Install or Installed Status */}
+      <AnimatePresence>
+        {showModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={handleCloseModal}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-xs"
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0, y: 8 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.96, opacity: 0, y: 8 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-lg bg-neutral-900 border border-neutral-800 p-5 shadow-2xl text-neutral-100 space-y-4 font-mono select-none"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded flex items-center justify-center bg-[#012456] border border-sky-500/80 text-sky-400">
+                    {isActuallyInstalled ? (
+                      <ShieldCheck className="w-4 h-4" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-neutral-100">
+                      {isActuallyInstalled ? 'SNA Terminal Lab (PWA)' : 'Install SNA Terminal Lab'}
+                    </h3>
+                    <p className="text-[11px] text-neutral-400">
+                      {isActuallyInstalled ? 'Application is installed & offline ready' : 'Standalone Desktop & Mobile Experience'}
+                    </p>
+                  </div>
                 </div>
-                <h3 className="text-sm font-semibold">Install SNA Terminal</h3>
+
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="p-1 rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+                  aria-label="Close dialog"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleCloseGuide}
-                className="p-1 rounded text-neutral-400 hover:text-white"
-                aria-label="Dismiss install instructions"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
 
-            <p className="text-xs text-neutral-300 leading-relaxed">
-              {isIOS ? (
-                <>
-                  Install directly on your iPhone or iPad home screen for genuine zero-network offline lab access:
-                </>
+              {/* Body: Installed State Info */}
+              {isActuallyInstalled ? (
+                <div className="space-y-3 text-xs">
+                  <div className="p-3 rounded bg-neutral-950 border border-neutral-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-400">Status:</span>
+                      <span className="text-sky-300 font-semibold flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5 text-sky-400" /> Installed & Running
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-400">Offline Capability:</span>
+                      <span className="text-neutral-200">100% Zero Network Lab</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-400">Virtual State:</span>
+                      <span className="text-neutral-200">Persisted locally in storage</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded bg-[#012456]/40 border border-sky-800/60 p-3 space-y-1.5 text-[11px] text-sky-200">
+                    <div className="font-semibold text-sky-300 flex items-center gap-1.5">
+                      <Smartphone className="w-3.5 h-3.5 text-sky-400" />
+                      Standalone Window Advantage
+                    </div>
+                    <p className="text-sky-200/90 leading-relaxed">
+                      SNA Terminal Lab runs as an independent application window without browser chrome. All curriculum exercises, simulated disks, services, and file system states remain saved on your device.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="w-full py-2 rounded bg-neutral-800 hover:bg-neutral-700 text-xs font-medium text-neutral-200 transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
               ) : (
-                <>
-                  To install SNA Terminal Lab on this device:
-                </>
-              )}
-            </p>
+                /* Body: Not Yet Installed Instructions */
+                <div className="space-y-3 text-xs">
+                  {/* Quick Action if browser supports prompt */}
+                  {isInstallable && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const ok = await install();
+                        if (ok) {
+                          setJustInstalled(true);
+                          setShowModal(false);
+                        }
+                      }}
+                      className="w-full py-2.5 rounded bg-[#012456] hover:bg-[#02357a] text-sky-100 border border-sky-500/80 font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                    >
+                      <Download className="w-4 h-4 text-sky-400" />
+                      <span>Install Directly to Device</span>
+                    </button>
+                  )}
 
-            <div className="space-y-2 bg-black/40 rounded-lg p-3 border border-white/5 text-xs text-neutral-300">
-              {isIOS ? (
-                <>
-                  <div className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-sky-600/30 text-sky-300 flex items-center justify-center text-[10px] font-bold shrink-0">1</span>
-                    <span>Tap the <strong className="text-sky-300">Share</strong> button <Share2 className="w-3.5 h-3.5 inline mx-0.5" /> in Safari toolbar.</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-sky-600/30 text-sky-300 flex items-center justify-center text-[10px] font-bold shrink-0">2</span>
-                    <span>Scroll down and select <strong className="text-sky-300">Add to Home Screen</strong>.</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-emerald-600/30 text-emerald-300 flex items-center justify-center text-[10px] font-bold shrink-0">1</span>
-                    <span>Click the <strong>Install</strong> icon in your browser address bar (top right).</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-emerald-600/30 text-emerald-300 flex items-center justify-center text-[10px] font-bold shrink-0">2</span>
-                    <span>Confirm <strong>Install</strong> to launch as a standalone desktop app.</span>
-                  </div>
-                </>
-              )}
-            </div>
+                  <p className="text-[11px] text-neutral-300 leading-relaxed">
+                    Install SNA Terminal Lab to run completely offline without an active internet connection, with full-screen window access and your practice state securely saved on this device.
+                  </p>
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleCloseGuide}
-                className="flex-1 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-medium text-white transition-colors"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                  {/* Device-Specific Steps */}
+                  <div className="p-3 rounded bg-neutral-950 border border-neutral-800 space-y-2.5">
+                    <div className="text-[11px] font-semibold text-neutral-300 flex items-center gap-1.5">
+                      {isIOS ? (
+                        <>
+                          <Smartphone className="w-3.5 h-3.5 text-sky-400" />
+                          <span>iOS Safari (iPhone / iPad)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Laptop className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Desktop / Mobile Browser</span>
+                        </>
+                      )}
+                    </div>
+
+                    {isIOS ? (
+                      <ol className="space-y-2 text-[11px] text-neutral-300 list-none">
+                        <li className="flex items-start gap-2">
+                          <span className="w-4 h-4 rounded bg-[#012456] text-sky-300 border border-sky-700 flex items-center justify-center text-[10px] shrink-0 font-bold">1</span>
+                          <span>Tap the Safari <strong className="text-sky-300">Share</strong> button <Share2 className="w-3 h-3 inline mx-0.5 text-sky-400" />.</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="w-4 h-4 rounded bg-[#012456] text-sky-300 border border-sky-700 flex items-center justify-center text-[10px] shrink-0 font-bold">2</span>
+                          <span>Scroll down and select <strong className="text-sky-300">Add to Home Screen</strong>.</span>
+                        </li>
+                      </ol>
+                    ) : (
+                      <ol className="space-y-2 text-[11px] text-neutral-300 list-none">
+                        <li className="flex items-start gap-2">
+                          <span className="w-4 h-4 rounded bg-[#012456] text-sky-300 border border-sky-700 flex items-center justify-center text-[10px] shrink-0 font-bold">1</span>
+                          <span>Click the <strong className="text-neutral-100">Install</strong> icon in your browser address bar (top right) or browser menu.</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="w-4 h-4 rounded bg-[#012456] text-sky-300 border border-sky-700 flex items-center justify-center text-[10px] shrink-0 font-bold">2</span>
+                          <span>Confirm <strong className="text-neutral-100">Install</strong> to launch as a standalone desktop window.</span>
+                        </li>
+                      </ol>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleCloseModal}
+                      className="flex-1 py-2 rounded bg-neutral-800 hover:bg-neutral-700 text-xs font-medium text-neutral-300 transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
+

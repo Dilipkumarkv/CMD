@@ -20,6 +20,7 @@ import {
   COMMAND_REFERENCE,
   CommandCategory,
 } from '../data/commandReference';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface CommandGuideModalProps {
   isOpen: boolean;
@@ -110,6 +111,7 @@ export function CommandGuideModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
+          onClick={onClose}
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4"
         >
           <motion.div
@@ -117,6 +119,7 @@ export function CommandGuideModal({
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.98, opacity: 0, y: 6 }}
             transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+            onClick={(e) => e.stopPropagation()}
             className="w-full max-w-5xl h-[90vh] bg-neutral-900 border border-neutral-800 rounded-lg shadow-2xl flex flex-col overflow-hidden text-neutral-100"
           >
             {/* Modal Header: Clean, minimal "Command Reference Guide" */}
@@ -128,15 +131,18 @@ export function CommandGuideModal({
                 </h2>
               </div>
 
-              {/* Close Button */}
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-1 rounded text-neutral-400 hover:text-emerald-400 hover:bg-neutral-800/80 transition-colors"
-                aria-label="Close command reference guide"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              {/* Header Actions & Close Button */}
+              <div className="flex items-center gap-2">
+                <PWAInstallButton shellMode={activeShell} />
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="p-1 rounded text-neutral-400 hover:text-emerald-400 hover:bg-neutral-800/80 transition-colors"
+                  aria-label="Close command reference guide"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Compact Toolbar: Search, Shell toggle, and Category chips */}

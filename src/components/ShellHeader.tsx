@@ -29,10 +29,10 @@ export function ShellHeader({
       }`}
     >
       {/* Top Title Bar with Windows Style Dots & Title */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0 shrink">
           <div
-            className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold transition-colors duration-300 ${
+            className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold transition-colors duration-300 shrink-0 ${
               isPS
                 ? 'bg-sky-500 text-[#012456]'
                 : 'bg-neutral-700 text-neutral-200'
@@ -45,7 +45,7 @@ export function ShellHeader({
               {isPS ? 'Windows PowerShell' : 'Command Prompt'}
             </span>
             <span
-              className={`hidden xs:inline-block text-[10px] px-1.5 py-0.2 rounded font-mono transition-colors duration-300 ${
+              className={`hidden sm:inline-block text-[10px] px-1.5 py-0.2 rounded font-mono transition-colors duration-300 ${
                 isPS
                   ? 'bg-sky-950/80 text-sky-400 border border-sky-800/60'
                   : 'bg-neutral-800 text-neutral-400 border border-neutral-700'
@@ -56,33 +56,38 @@ export function ShellHeader({
           </div>
         </div>
 
-        {/* Action Buttons: Install, Help & Reset */}
-        <div className="flex items-center gap-1.5">
+        {/* Action Buttons: Install, Commands & Reset */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <PWAInstallButton shellMode={shellMode} />
-
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            type="button"
-            id="reset-lab-btn"
-            onClick={onOpenReset}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/60 transition-colors"
-            title="Reset lab virtual machine to clean state"
-          >
-            <RotateCcw className="w-3 h-3 text-rose-400" />
-            <span className="hidden sm:inline">Reset Lab</span>
-          </motion.button>
 
           <motion.button
             whileTap={{ scale: 0.95 }}
             type="button"
             id="view-commands-btn"
             onClick={onOpenCommands}
-            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-neutral-800/80 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 transition-colors"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border transition-colors shadow-xs ${
+              isPS
+                ? 'bg-sky-950/70 hover:bg-sky-900/80 text-sky-200 border-sky-800/60 hover:border-sky-700'
+                : 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-200 border-neutral-700 hover:border-neutral-600'
+            }`}
             title="Command Reference & Practice Guide (Basic to Advanced)"
             aria-label="Commands Guide"
           >
-            <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+            <BookOpen className={`w-3.5 h-3.5 shrink-0 ${isPS ? 'text-sky-400' : 'text-emerald-400'}`} />
             <span className="hidden sm:inline font-medium">Commands</span>
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            type="button"
+            id="reset-lab-btn"
+            onClick={onOpenReset}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/60 hover:border-rose-700 transition-colors shadow-xs"
+            title="Reset lab virtual machine to clean state"
+            aria-label="Reset virtual machine"
+          >
+            <RotateCcw className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+            <span className="hidden sm:inline font-medium">Reset Lab</span>
           </motion.button>
         </div>
       </div>
@@ -140,7 +145,7 @@ export function ShellHeader({
         </div>
 
         {/* Live Device Storage / Offline Status */}
-        <div className="hidden xs:flex items-center gap-1.5 text-[11px] font-mono">
+        <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-mono">
           {!isOnline ? (
             <motion.span 
               initial={{ opacity: 0, scale: 0.9 }}

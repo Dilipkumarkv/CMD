@@ -56,7 +56,7 @@ export interface SimulatedVolume {
   volNum: number;
   letter: string;
   label: string;
-  fs: 'NTFS' | 'FAT32' | 'RAW';
+  fs: 'NTFS' | 'FAT32' | 'exFAT' | 'RAW';
   type: 'Partition' | 'Removable';
   sizeGB: number;
   status: 'Healthy' | 'Degraded';
@@ -142,6 +142,10 @@ export class LabContext {
     bootmenupolicy: 'Standard',
   };
   public selectedDiskIndex: number = 0;
+  public selectedPartitionIndex: number = 1;
+  public selectedVolumeIndex: number = 0;
+  public inDiskPart: false | 'cmd' | 'ps' = false;
+  public activeShell: 'cmd' | 'ps' = 'cmd';
   public currentUser: string = 'Student';
   public computerName: string = 'DESKTOP-SNA25';
   public clsTriggered: boolean = false;
