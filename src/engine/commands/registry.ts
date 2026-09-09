@@ -1,4 +1,5 @@
 import { LabContext } from '../context';
+import { explainCommand } from '../explain';
 import { parseCommandLine } from '../tokenizer';
 import {
   attribCommand,
@@ -114,6 +115,12 @@ export const defaultRegistry: CommandRegistry = {
   bcdedit: bcdeditCommand,
   dism: dismCommand,
   rasdial: rasdialCommand,
+
+  // Command Explainer & Manual Reference
+  explain: (pos, _flags, _switches, _ctx, rawCmd) => {
+    const target = rawCmd ? rawCmd.replace(/^explain\s*/i, '').trim() : pos.join(' ');
+    return { error: false, text: explainCommand(target, 'cmd') };
+  },
 };
 
 function checkRedirection(line: string): { cmdPart: string; targetFile?: string; append?: boolean } {

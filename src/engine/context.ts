@@ -144,9 +144,9 @@ export class LabContext {
   public selectedDiskIndex: number = 0;
   public selectedPartitionIndex: number = 1;
   public selectedVolumeIndex: number = 0;
-  public inDiskPart: false | 'cmd' | 'ps' = false;
-  public activeShell: 'cmd' | 'ps' = 'cmd';
-  public currentUser: string = 'Student';
+  public inDiskPart: false | 'cmd' | 'ps' | 'bash' = false;
+  public activeShell: 'cmd' | 'ps' | 'bash' = 'cmd';
+  public currentUser: string = 'student';
   public computerName: string = 'DESKTOP-SNA25';
   public clsTriggered: boolean = false;
   public psVariables: Map<string, any> = new Map();

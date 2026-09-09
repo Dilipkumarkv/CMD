@@ -8,8 +8,8 @@ export function resolvePath(cwd: string, inputPath?: string): string {
     return normalizePathString(cwd);
   }
 
-  // Remove wrapping quotes and clean whitespace
-  let cleanInput = inputPath.trim().replace(/^["']|["']$/g, '');
+  // Remove wrapping quotes, null bytes, and clean whitespace
+  let cleanInput = (inputPath || '').replace(/\0/g, '').trim().replace(/^["']|["']$/g, '');
   // Normalize forward slashes to backslashes
   cleanInput = cleanInput.replace(/\//g, '\\');
 
@@ -89,7 +89,7 @@ function getDrive(pathStr: string): string {
 }
 
 export function normalizePathString(pathStr: string): string {
-  const clean = pathStr.trim().replace(/\//g, '\\');
+  const clean = (pathStr || '').replace(/\0/g, '').trim().replace(/\//g, '\\');
   const drive = getDrive(clean);
   const rest = clean.startsWith(drive) ? clean.slice(drive.length) : clean;
   const segments = rest.split('\\').filter(Boolean);

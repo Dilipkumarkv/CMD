@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { AlertTriangle, RotateCcw, X } from 'lucide-react';
 
 interface ResetModalProps {
@@ -17,57 +17,56 @@ export function ResetModal({ isOpen, onClose, onConfirm }: ResetModalProps) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           onClick={onClose}
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4"
         >
           <motion.div
-            initial={{ scale: 0.95, opacity: 0, y: 10 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.95, opacity: 0, y: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            initial={{ opacity: 0, y: "100%" }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: "100%" }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
             onClick={(e) => e.stopPropagation()}
             id="reset-lab-dialog"
             role="dialog"
             aria-modal="true"
-            className="w-full max-w-sm bg-neutral-900 border border-rose-900/60 rounded-xl p-4 sm:p-5 shadow-2xl text-neutral-100 space-y-4"
+            className="w-full sm:max-w-sm bg-[#18181b] sm:rounded-xl rounded-t-xl rounded-b-none p-5 sm:p-6 text-neutral-100 space-y-5 border-t sm:border border-rose-900/40 shadow-[0_-10px_40px_-15px_rgba(225,29,72,0.2)] sm:shadow-2xl"
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-full bg-rose-950/80 border border-rose-800 text-rose-400">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500">
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Reset Lab Environment?</h3>
-                  <p className="text-xs text-rose-300/80">Confirmation required</p>
+                  <h3 className="text-base font-bold text-white tracking-tight">Reset Lab Environment?</h3>
+                  <p className="text-xs text-rose-300/80">This action is irreversible</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1 rounded text-neutral-400 hover:text-white transition-colors"
+                className="p-1 rounded text-neutral-500 hover:text-white hover:bg-white/10 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-
-            <div className="text-xs text-neutral-300 space-y-2 leading-relaxed bg-neutral-950 p-3 rounded-md border border-neutral-800">
+            
+            <div className="text-xs text-neutral-300 space-y-2 leading-relaxed bg-black/40 p-4 rounded-lg border border-white/5 shadow-inner">
               <p>
-                This action will revert your virtual machine back to the <strong>clean Phase 1 baseline</strong>:
+                This will revert the virtual machine to its <strong>clean baseline</strong>:
               </p>
-              <ul className="list-disc list-inside space-y-1 text-neutral-400 pl-1">
-                <li>Deletes any files or folders created by the student</li>
-                <li>Revives all terminated processes (Notepad, Chrome)</li>
-                <li>Restores default user accounts and working directory</li>
-                <li>Clears active terminal command variables</li>
+              <ul className="list-disc list-inside space-y-1 text-neutral-400 pl-1 marker:text-neutral-600">
+                <li>Delete all student-created files/folders</li>
+                <li>Restore default user accounts</li>
+                <li>Clear terminal variables</li>
               </ul>
             </div>
-
-            <div className="flex items-center justify-end gap-2 pt-1">
+            
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded text-xs font-medium bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-colors"
+                className="px-4 py-2 rounded-lg text-xs font-semibold bg-white/5 hover:bg-white/10 text-neutral-300 transition-colors"
               >
-                Keep My Work
+                Cancel
               </button>
               <motion.button
                 whileTap={{ scale: 0.95 }}
@@ -77,10 +76,10 @@ export function ResetModal({ isOpen, onClose, onConfirm }: ResetModalProps) {
                   onConfirm();
                   onClose();
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition-colors shadow-sm"
+                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition-colors shadow-[0_0_15px_rgba(225,29,72,0.4)] hover:shadow-[0_0_20px_rgba(225,29,72,0.6)]"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Yes, Reset Everything</span>
+                <RotateCcw className="w-4 h-4" />
+                <span>Reset Environment</span>
               </motion.button>
             </div>
           </motion.div>

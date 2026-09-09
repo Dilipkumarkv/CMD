@@ -1,4 +1,5 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { ShellMode } from "../types/terminal";
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Check,
   Download,
@@ -14,7 +15,7 @@ import { usePWAInstall } from '../hooks/usePWAInstall';
 
 interface PWAInstallButtonProps {
   variant?: 'header' | 'standalone';
-  shellMode?: 'cmd' | 'ps';
+  shellMode?: ShellMode;
 }
 
 export function PWAInstallButton({ variant = 'header', shellMode = 'cmd' }: PWAInstallButtonProps) {
@@ -50,32 +51,26 @@ export function PWAInstallButton({ variant = 'header', shellMode = 'cmd' }: PWAI
 
   return (
     <>
-      <motion.button
-        whileTap={{ scale: 0.95 }}
+      <button
         type="button"
         id="pwa-install-btn"
         onClick={handleInstallClick}
-        className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors shadow-xs ${
-          isActuallyInstalled
-            ? 'bg-[#012456] hover:bg-[#01357d] text-sky-200 border border-sky-600/80'
-            : 'bg-[#012456] hover:bg-[#01357d] text-sky-100 border border-sky-500/80 hover:border-sky-400'
-        }`}
-        title={
-          isActuallyInstalled
-            ? 'SNA Terminal Lab is installed as a PWA (Click for offline status & details)'
-            : 'Install SNA Terminal Lab for offline home screen / desktop access'
-        }
-        aria-label={isActuallyInstalled ? 'App is installed' : 'Install SNA Terminal Lab'}
+        className="flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-[#012456]/40 hover:bg-[#012456]/80 active:scale-95 border border-sky-500/40 text-sky-300 hover:text-sky-100 transition-all text-xs font-mono focus-visible:ring-1 focus-visible:ring-sky-400"
+        title={isActuallyInstalled ? "App Installed & Offline Ready" : "Install App Locally"}
+        aria-label="Install App"
       >
         {isActuallyInstalled ? (
-          <Check className="w-3.5 h-3.5 shrink-0 text-sky-400" />
+          <>
+            <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden lg:inline text-[11px] text-sky-300 font-medium">Installed</span>
+          </>
         ) : (
-          <Download className="w-3.5 h-3.5 shrink-0 text-sky-400" />
+          <>
+            <Download className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden lg:inline text-[11px] text-sky-300 font-medium">Install</span>
+          </>
         )}
-        <span className="hidden sm:inline font-medium">
-          {isActuallyInstalled ? 'Installed' : 'Install'}
-        </span>
-      </motion.button>
+      </button>
 
       {/* Interactive Modal: Guided Install or Installed Status */}
       <AnimatePresence>

@@ -1,4 +1,5 @@
 import { LabContext } from '../context';
+import { explainCommand } from '../explain';
 import { defaultRegistry } from '../commands/registry';
 import { ipconfigCommand } from '../commands/network-commands';
 import { diskpartCommand } from '../commands/syllabus-commands';
@@ -83,6 +84,10 @@ export class PowerShellEngine {
     this.register(['test-connection', 'ping'], testConnectionCmdlet);
     this.register(['get-date'], getDateCmdlet);
     this.register(['get-help', 'help'], getHelpCmdlet);
+    this.register(['explain'], (stage) => {
+      const target = stage.positional.join(' ');
+      return explainCommand(target, 'ps');
+    });
 
     // Week 8, 10, 11 PowerShell Cmdlets
     this.register(['get-netipaddress'], getNetIPAddressCmdlet);

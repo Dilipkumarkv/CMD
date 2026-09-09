@@ -1,29 +1,40 @@
 import { LabContext } from '../engine/context';
 
-export function saveLabState(ctx: LabContext) {
-  try {
-    const data = {
-      ...ctx,
-      users: Array.from(ctx.users.entries()),
-      psVariables: Array.from(ctx.psVariables.entries()),
-    };
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-    localStorage.setItem('lab_state', JSON.stringify(data, (key, value) => {
-      if (key === 'parent') {
-        return undefined; // Break circular reference in VFS
-      }
-      if (value instanceof HTMLElement || (value && value.nodeType)) {
-        return undefined; // Filter out DOM nodes just in case
-      }
-      return value;
-    }));
-  } catch (e) {
-    console.error('Failed to save lab state to localStorage', e);
+export function saveLabState(ctx: LabContext) {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+
+  if (saveTimer) {
+    clearTimeout(saveTimer);
   }
+
+  saveTimer = setTimeout(() => {
+    try {
+      const data = {
+        ...ctx,
+        users: Array.from(ctx.users.entries()),
+        psVariables: Array.from(ctx.psVariables.entries()),
+      };
+
+      localStorage.setItem('lab_state', JSON.stringify(data, (key, value) => {
+        if (key === 'parent') {
+          return undefined; // Break circular reference in VFS
+        }
+        if (value instanceof HTMLElement || (value && value.nodeType)) {
+          return undefined; // Filter out DOM nodes just in case
+        }
+        return value;
+      }));
+    } catch (e) {
+      console.warn('Unable to persist lab state to localStorage:', e);
+    }
+  }, 120);
 }
 
 export function loadLabState(): LabContext | null {
   try {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
     const raw = localStorage.getItem('lab_state');
     if (!raw) return null;
 
@@ -58,7 +69,7 @@ export function loadLabState(): LabContext | null {
       }
 
       Object.assign(ctx.vfs, vfsData);
-      
+
       const drives = ctx.vfs.getDrives();
       if (!drives['D:']) drives['D:'] = { type: 'dir', children: {}, attrs: {} };
       if (!drives['E:']) drives['E:'] = { type: 'dir', children: {}, attrs: {} };
@@ -67,11 +78,21 @@ export function loadLabState(): LabContext | null {
 
     return ctx;
   } catch (e) {
-    console.error('Failed to load lab state from localStorage', e);
+    console.warn('Failed to load lab state from localStorage, using fresh state:', e);
     return null;
   }
 }
 
 export function clearLabState() {
-  localStorage.removeItem('lab_state');
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem('lab_state');
+    }
+  } catch (e) {
+    console.warn('Failed to clear lab state from localStorage:', e);
+  }
 }

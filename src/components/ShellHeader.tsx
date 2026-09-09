@@ -1,164 +1,180 @@
-import { motion } from 'framer-motion';
-import { BookOpen, HardDrive, RotateCcw, Terminal, WifiOff } from 'lucide-react';
+import { motion } from 'motion/react';
+import {
+  HardDrive,
+  RotateCcw,
+  Terminal,
+  TerminalSquare,
+  FileCode2,
+  WifiOff,
+  CheckCircle2,
+} from 'lucide-react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { PWAInstallButton } from './PWAInstallButton';
+import { ShellMode } from '../types/terminal';
 
 interface ShellHeaderProps {
-  shellMode: 'cmd' | 'ps';
-  onSwitchMode: (mode: 'cmd' | 'ps') => void;
+  shellMode: ShellMode;
+  onSwitchMode: (mode: ShellMode) => void;
   onOpenReset: () => void;
-  onOpenCommands: () => void;
+  toastMessage?: string | null;
 }
 
 export function ShellHeader({
   shellMode,
   onSwitchMode,
   onOpenReset,
-  onOpenCommands,
+  toastMessage,
 }: ShellHeaderProps) {
   const isPS = shellMode === 'ps';
+  const isBash = shellMode === 'bash';
+  const isCMD = shellMode === 'cmd';
   const isOnline = useOnlineStatus();
 
   return (
     <header
       id="terminal-header"
-      className={`select-none border-b transition-colors duration-300 px-3 py-2 flex flex-col gap-2 ${
-        isPS
-          ? 'bg-[#011c40] border-sky-900/60 text-sky-100'
-          : 'bg-[#121212] border-neutral-800 text-neutral-200'
-      }`}
+      className="select-none border-b border-white/[0.08] bg-[#0A0C0F] text-neutral-200 px-3 pt-2.5 pb-2 flex flex-col gap-2 shrink-0 transition-colors"
     >
-      {/* Top Title Bar with Windows Style Dots & Title */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0 shrink">
-          <div
-            className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold transition-colors duration-300 shrink-0 ${
-              isPS
-                ? 'bg-sky-500 text-[#012456]'
-                : 'bg-neutral-700 text-neutral-200'
-            }`}
-          >
-            {isPS ? '>_' : 'C:'}
+      {/* Top Application Bar */}
+      <div className="flex items-center justify-between gap-3">
+        {/* Brand & Context */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-neutral-900/90 border border-white/10 flex items-center justify-center shrink-0 shadow-inner">
+            <Terminal className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="min-w-0 flex items-baseline gap-1.5">
-            <span className="text-xs font-semibold tracking-wide truncate">
-              {isPS ? 'Windows PowerShell' : 'Command Prompt'}
-            </span>
-            <span
-              className={`hidden sm:inline-block text-[10px] px-1.5 py-0.2 rounded font-mono transition-colors duration-300 ${
-                isPS
-                  ? 'bg-sky-950/80 text-sky-400 border border-sky-800/60'
-                  : 'bg-neutral-800 text-neutral-400 border border-neutral-700'
-              }`}
-            >
-              {isPS ? 'v5.1' : 'cmd.exe'}
+          <div className="min-w-0 flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-sm font-bold tracking-tight text-neutral-100 truncate font-mono">
+                SNA Terminal Lab
+              </span>
+              <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-white/[0.06] text-neutral-400 border border-white/[0.06]">
+                Omni-Term
+              </span>
+            </div>
+            <span className="text-[10px] text-neutral-400 font-mono truncate hidden xs:block">
+              Polytechnic System & Network Admin Practice
             </span>
           </div>
         </div>
 
-        {/* Action Buttons: Install, Commands & Reset */}
+        {/* Global Actions: Install, Reset */}
         <div className="flex items-center gap-1.5 shrink-0">
           <PWAInstallButton shellMode={shellMode} />
 
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            type="button"
-            id="view-commands-btn"
-            onClick={onOpenCommands}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border transition-colors shadow-xs ${
-              isPS
-                ? 'bg-sky-950/70 hover:bg-sky-900/80 text-sky-200 border-sky-800/60 hover:border-sky-700'
-                : 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-200 border-neutral-700 hover:border-neutral-600'
-            }`}
-            title="Command Reference & Practice Guide (Basic to Advanced)"
-            aria-label="Commands Guide"
-          >
-            <BookOpen className={`w-3.5 h-3.5 shrink-0 ${isPS ? 'text-sky-400' : 'text-emerald-400'}`} />
-            <span className="hidden sm:inline font-medium">Commands</span>
-          </motion.button>
-
-          <motion.button
-            whileTap={{ scale: 0.95 }}
+          <button
             type="button"
             id="reset-lab-btn"
             onClick={onOpenReset}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/60 hover:border-rose-700 transition-colors shadow-xs"
-            title="Reset lab virtual machine to clean state"
+            className="flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-rose-500/10 hover:bg-rose-500/20 active:scale-95 border border-rose-500/20 text-rose-300 hover:text-rose-200 transition-all text-xs font-mono focus-visible:ring-1 focus-visible:ring-rose-400"
+            title="Reset lab virtual environment"
             aria-label="Reset virtual machine"
           >
-            <RotateCcw className="w-3.5 h-3.5 shrink-0 text-rose-400" />
-            <span className="hidden sm:inline font-medium">Reset Lab</span>
-          </motion.button>
+            <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
+            <span className="hidden md:inline font-medium">Reset VM</span>
+          </button>
         </div>
       </div>
 
-      {/* Mode Switcher Segmented Control */}
-      <div className="flex items-center justify-between gap-2 pt-0.5">
-        <div className="inline-flex rounded bg-black/40 p-0.5 border border-white/10 w-full sm:w-auto relative">
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            type="button"
-            id="mode-cmd-toggle"
-            onClick={() => onSwitchMode('cmd')}
-            className={`relative z-10 flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-medium transition-colors ${
-              !isPS
-                ? 'text-neutral-100 font-semibold'
-                : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            {!isPS && (
-              <motion.div
-                layoutId="active-mode-bg"
-                className="absolute inset-0 bg-neutral-800 rounded shadow-sm border border-neutral-700"
-                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-              />
-            )}
-            <span className="relative z-20 flex items-center gap-1.5">
-              <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-              <span>CMD</span>
-            </span>
-          </motion.button>
+      {/* Segmented Terminal Mode Switcher */}
+      <nav
+        aria-label="Terminal Environment Selection"
+        className="w-full bg-black/40 p-1 rounded-lg border border-white/[0.06] flex items-center gap-1"
+      >
+        {/* CMD Tab */}
+        <button
+          type="button"
+          onClick={() => onSwitchMode('cmd')}
+          aria-selected={isCMD}
+          className={`relative flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-xs font-mono font-medium transition-all duration-150 active:scale-[0.98] ${
+            isCMD
+              ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-[0_1px_10px_rgba(16,185,129,0.15)]'
+              : 'text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03] border border-transparent'
+          }`}
+        >
+          <TerminalSquare className={`w-3.5 h-3.5 ${isCMD ? 'text-emerald-400' : 'text-neutral-500'}`} />
+          <span className="font-semibold">CMD</span>
+        </button>
 
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            type="button"
-            id="mode-ps-toggle"
-            onClick={() => onSwitchMode('ps')}
-            className={`relative z-10 flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-medium transition-colors ${
-              isPS
-                ? 'text-white font-semibold'
-                : 'text-neutral-400 hover:text-neutral-200'
+        {/* PowerShell Tab */}
+        <button
+          type="button"
+          onClick={() => onSwitchMode('ps')}
+          aria-selected={isPS}
+          className={`relative flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-xs font-mono font-medium transition-all duration-150 active:scale-[0.98] ${
+            isPS
+              ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30 shadow-[0_1px_10px_rgba(14,165,233,0.15)]'
+              : 'text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03] border border-transparent'
+          }`}
+        >
+          <Terminal className={`w-3.5 h-3.5 ${isPS ? 'text-sky-400' : 'text-neutral-500'}`} />
+          <span className="font-semibold">
+            <span className="hidden sm:inline">PowerShell</span>
+            <span className="inline sm:hidden">PS</span>
+          </span>
+        </button>
+
+        {/* Bash Tab */}
+        <button
+          type="button"
+          onClick={() => onSwitchMode('bash')}
+          aria-selected={isBash}
+          className={`relative flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-xs font-mono font-medium transition-all duration-150 active:scale-[0.98] ${
+            isBash
+              ? 'bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/30 shadow-[0_1px_10px_rgba(217,70,239,0.15)]'
+              : 'text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03] border border-transparent'
+          }`}
+        >
+          <FileCode2 className={`w-3.5 h-3.5 ${isBash ? 'text-fuchsia-400' : 'text-neutral-500'}`} />
+          <span className="font-semibold">Bash</span>
+        </button>
+      </nav>
+
+      {/* In-Place Context & Notification Strip (Zero CLS - Stable 24px Height) */}
+      <div
+        id="terminal-status-strip"
+        className={`h-6 w-full rounded px-2.5 flex items-center justify-between text-[11px] font-mono border transition-all duration-200 ${
+          toastMessage
+            ? isCMD
+              ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
+              : isPS
+              ? 'bg-sky-950/40 border-sky-500/30 text-sky-300'
+              : 'bg-fuchsia-950/40 border-fuchsia-500/30 text-fuchsia-300'
+            : 'bg-black/30 border-white/[0.04] text-neutral-400'
+        }`}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={`w-1.5 h-1.5 rounded-full shrink-0 transition-colors ${
+              toastMessage
+                ? isCMD
+                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)] animate-pulse'
+                  : isPS
+                  ? 'bg-sky-400 shadow-[0_0_8px_rgba(14,165,233,0.9)] animate-pulse'
+                  : 'bg-fuchsia-400 shadow-[0_0_8px_rgba(217,70,239,0.9)] animate-pulse'
+                : 'bg-neutral-600'
             }`}
-          >
-            {isPS && (
-              <motion.div
-                layoutId="active-mode-bg"
-                className="absolute inset-0 bg-sky-700 rounded shadow-sm border border-sky-600"
-                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-              />
-            )}
-            <span className="relative z-20 flex items-center gap-1.5">
-              <span className="font-bold text-sky-300 text-[11px]">PS</span>
-              <span>PowerShell</span>
-            </span>
-          </motion.button>
+          />
+          <span className="truncate font-medium">
+            {toastMessage
+              ? toastMessage
+              : isCMD
+              ? 'Windows Command Prompt (cmd.exe)'
+              : isPS
+              ? 'Windows PowerShell (v5.1 Console Host)'
+              : 'GNU/Linux Bash Shell (v5.1.16)'}
+          </span>
         </div>
 
-        {/* Live Device Storage / Offline Status */}
-        <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-mono">
+        <div className="flex items-center gap-2 shrink-0 pl-2">
           {!isOnline ? (
-            <motion.span 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-1 text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/60 font-medium"
-            >
-              <WifiOff className="w-3 h-3 text-amber-400" />
-              <span>Offline &bull; Progress saved on device</span>
-            </motion.span>
+            <span className="flex items-center gap-1 text-amber-400 text-[10px]">
+              <WifiOff className="w-3.5 h-3.5" />
+              <span>Offline Mode</span>
+            </span>
           ) : (
-            <span className="flex items-center gap-1 text-slate-400">
-              <HardDrive className="w-3 h-3 text-emerald-500" />
-              <span>Offline-ready &bull; Synced VM</span>
+            <span className="hidden sm:flex items-center gap-1 text-neutral-400 text-[10px]">
+              <CheckCircle2 className="w-3.5 h-3.5 text-neutral-400" />
+              <span>VM Ready</span>
             </span>
           )}
         </div>
@@ -166,3 +182,4 @@ export function ShellHeader({
     </header>
   );
 }
+

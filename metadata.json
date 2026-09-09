@@ -1,6 +1,6 @@
 {
   "name": "SNA Terminal Lab",
-  "description": "Offline Windows CMD and PowerShell practice lab for System and Network Administration polytechnic students.",
+  "description": "Offline Windows CMD, PowerShell, and Bash practice lab for System and Network Administration polytechnic students.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

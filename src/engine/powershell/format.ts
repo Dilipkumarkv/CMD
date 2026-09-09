@@ -80,16 +80,16 @@ function formatFileInfoTable(items: PSFileInfo[], dirHeader?: string): string {
     lines.push(`    Directory: ${dirHeader}\n`);
   }
 
-  lines.push(`Mode                 LastWriteTime         Length Name`);
-  lines.push(`----                 -------------         ------ ----`);
+  lines.push(`Mode     LastWriteTime          Length Name`);
+  lines.push(`----     -------------          ------ ----`);
 
   for (const item of items) {
-    const mode = (item.Mode || '------').padEnd(7, ' ');
+    const mode = (item.Mode || '------').padEnd(6, ' ');
     const time = (item.LastWriteTime || '').padEnd(20, ' ');
     const len = (item.Length !== '' && item.Length !== undefined ? String(item.Length) : '').padStart(8, ' ');
     const name = item.Name || '';
 
-    lines.push(`${mode}        ${time} ${len} ${name}`);
+    lines.push(`${mode}   ${time}   ${len} ${name}`);
   }
 
   return lines.join('\n');

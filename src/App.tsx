@@ -2,31 +2,61 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-
-import { FormEvent, useCallback, useEffect, useState, useRef, KeyboardEvent } from 'react';
+import { FormEvent, useCallback, useEffect, useState, useRef, KeyboardEvent, useMemo } from 'react';
+import { BootScreen } from './components/BootScreen';
 import { CommandInputBar } from './components/CommandInputBar';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PWAInstallPromptBanner } from './components/PWAInstallPromptBanner';
 import { ResetModal } from './components/ResetModal';
 import { ShellHeader } from './components/ShellHeader';
 import { TerminalScreen } from './components/TerminalScreen';
-import { CommandGuideModal } from './components/CommandGuideModal';
 import { executeCommand } from './engine/commands/registry';
 import { LabContext } from './engine/context';
 import { defaultPSEngine } from './engine/powershell/pipeline';
-import { TerminalEntry } from './types/terminal';
+import { executeBashCommand } from './engine/bash/bashEngine';
+import { TerminalEntry, ShellMode } from './types/terminal';
 import { getTerminalColors } from './utils/colors';
 import { clearLabState, loadLabState, saveLabState } from './utils/storage';
+
+export function getShellBanner(mode: ShellMode): string {
+  switch (mode) {
+    case 'cmd':
+      return 'Microsoft CMD [Version 10.0]\nDeveloped by Dilip Kumar KV';
+    case 'ps':
+      return 'Microsoft PS [Version 10.0]\nDeveloped by Dilip Kumar KV';
+    case 'bash':
+      return 'Linux bash [Version 5.1.16]\nDeveloped by Dilip Kumar KV';
+  }
+}
 
 export default function App() {
   // Shared Virtual Machine State
   const [labContext, setLabContext] = useState<LabContext>(() => {
     return loadLabState() || new LabContext();
   });
-  const [shellMode, setShellMode] = useState<'cmd' | 'ps'>('cmd');
-  const getPromptString = (context: LabContext, shell: 'cmd' | 'ps') => {
+  const [, setLabVersion] = useState<number>(0);
+  const notifyLabMutation = useCallback(() => {
+    setLabVersion((v) => v + 1);
+  }, []);
+  const [shellMode, setShellMode] = useState<ShellMode>('cmd');
+  const getPromptString = (context: LabContext, shell: ShellMode) => {
     if (context.inDiskPart === shell) return 'DISKPART>';
     const cwd = context.vfs.getCwd();
+    if (shell === 'bash') {
+      let bashCwd = cwd.replace(/\\/g, '/');
+      if (bashCwd.startsWith('C:')) bashCwd = bashCwd.substring(2);
+      if (bashCwd.toLowerCase() === '/users/student' || bashCwd.toLowerCase() === '/home/student') {
+        bashCwd = '~';
+      } else if (bashCwd.toLowerCase().startsWith('/users/student/')) {
+        bashCwd = '~' + bashCwd.substring('/users/student'.length);
+      } else if (bashCwd.toLowerCase().startsWith('/home/student/')) {
+        bashCwd = '~' + bashCwd.substring('/home/student'.length);
+      }
+      if (!bashCwd) bashCwd = '/';
+      const host = context.computerName.toLowerCase().replace('desktop-', '');
+      const user = context.currentUser.toLowerCase();
+      return `${user}@${host}:${bashCwd}$ `;
+    }
     return shell === 'ps' ? `PS ${cwd}>` : `${cwd}>`;
   };
 
@@ -39,41 +69,67 @@ export default function App() {
 
   // Modals / Drawers
   const [isResetModalOpen, setIsResetModalOpen] = useState<boolean>(false);
-  const [isCommandGuideOpen, setIsCommandGuideOpen] = useState<boolean>(false);
 
-  const isCommandGuideOpenRef = useRef<boolean>(isCommandGuideOpen);
-  const isResetModalOpenRef = useRef<boolean>(isResetModalOpen);
+  // Dynamic visualViewport tracking: ensures mobile keyboard never blocks the terminal window
+  const [viewportHeight, setViewportHeight] = useState<number>(() => {
+    if (typeof window !== 'undefined' && window.visualViewport) {
+      return Math.round(window.visualViewport.height);
+    }
+    return typeof window !== 'undefined' ? window.innerHeight : 0;
+  });
 
   useEffect(() => {
-    isCommandGuideOpenRef.current = isCommandGuideOpen;
-  }, [isCommandGuideOpen]);
+    const updateViewport = () => {
+      if (typeof window === 'undefined') return;
+      if (window.visualViewport) {
+        const vh = Math.round(window.visualViewport.height);
+        setViewportHeight(vh);
+        // Keep document scroll reset so header/layout never drifts on iOS Safari
+        if (window.scrollY !== 0 || window.scrollX !== 0) {
+          window.scrollTo(0, 0);
+        }
+      } else {
+        setViewportHeight(window.innerHeight);
+      }
+
+      // Automatically keep the active terminal prompt and scroll area visible
+      const scrollArea = document.getElementById('terminal-scroll-area');
+      if (scrollArea) {
+        scrollArea.scrollTop = scrollArea.scrollHeight;
+      }
+      const activeInput = document.getElementById('terminal-input');
+      activeInput?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    };
+
+    updateViewport();
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewport);
+      window.visualViewport.addEventListener('scroll', updateViewport);
+    }
+    window.addEventListener('resize', updateViewport);
+    window.addEventListener('orientationchange', updateViewport);
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateViewport);
+        window.visualViewport.removeEventListener('scroll', updateViewport);
+      }
+      window.removeEventListener('resize', updateViewport);
+      window.removeEventListener('orientationchange', updateViewport);
+    };
+  }, []);
+
+  const isResetModalOpenRef = useRef<boolean>(isResetModalOpen);
 
   useEffect(() => {
     isResetModalOpenRef.current = isResetModalOpen;
   }, [isResetModalOpen]);
 
   // Modal open/close handlers with history state synchronization
-  const handleOpenCommands = () => {
-    try {
-      window.history.pushState({ modal: 'commandGuide' }, '');
-    } catch {
-      // ignore
-    }
-    setIsCommandGuideOpen(true);
-  };
-
-  const handleCloseCommands = () => {
-    setIsCommandGuideOpen(false);
-    if (window.history.state?.modal === 'commandGuide') {
-      try {
-        window.history.replaceState({ app: 'terminal' }, '');
-      } catch {
-        // ignore
-      }
-    }
-  };
-
   const handleOpenReset = () => {
+    const termInput = document.getElementById('terminal-input') as HTMLInputElement | null;
+    termInput?.blur();
     try {
       window.history.pushState({ modal: 'reset' }, '');
     } catch {
@@ -104,10 +160,6 @@ export default function App() {
 
     const onPopState = () => {
       // If a modal is open, back button simply dismisses the modal
-      if (isCommandGuideOpenRef.current) {
-        setIsCommandGuideOpen(false);
-        return;
-      }
       if (isResetModalOpenRef.current) {
         setIsResetModalOpen(false);
         return;
@@ -148,9 +200,7 @@ export default function App() {
       }
 
       if (e.key === 'Escape') {
-        if (isCommandGuideOpenRef.current) {
-          handleCloseCommands();
-        } else if (isResetModalOpenRef.current) {
+        if (isResetModalOpenRef.current) {
           handleCloseReset();
         }
       }
@@ -168,25 +218,48 @@ export default function App() {
       id: 'init-header-cmd',
       type: 'output',
       shell: 'cmd',
-      output:
-        'Microsoft CMD [Version 10.0]\nDeveloped by Dilip Kumar',
+      output: getShellBanner('cmd'),
       timestamp: Date.now(),
     },
     {
       id: 'init-header-ps',
       type: 'output',
       shell: 'ps',
-      output:
-        'Microsoft PS [Version 10.0]\nDeveloped by Dilip Kumar',
+      output: getShellBanner('ps'),
       timestamp: Date.now(),
-    }
+    },
+    {
+      id: 'init-header-bash',
+      type: 'output',
+      shell: 'bash',
+      output: getShellBanner('bash'),
+      timestamp: Date.now(),
+    },
   ]);
+
+  const [streamedIds, setStreamedIds] = useState<Set<string>>(() => new Set());
+
+  const handleMarkStreamed = useCallback((id: string) => {
+    setStreamedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
 
   // Execute a command string in the active or specified shell
   const runCommand = useCallback(
-    (rawCmd: string, explicitShell?: 'cmd' | 'ps') => {
+    (rawCmd: string, explicitShell?: ShellMode) => {
       const trimmed = rawCmd.trim();
       if (!trimmed) return;
+
+      // Automatically dismiss virtual keyboard on mobile upon command execution
+      const termInput = document.getElementById('terminal-input') as HTMLInputElement | null;
+      termInput?.blur();
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
 
       const activeShell = explicitShell || shellMode;
       labContext.activeShell = activeShell;
@@ -200,24 +273,20 @@ export default function App() {
       setHistoryPointer(-1);
 
       // Handle interactive shell switching
-      if (activeShell === 'cmd' && trimmed.toLowerCase() === 'powershell') {
+      const lower = trimmed.toLowerCase();
+      if ((lower === 'powershell' || lower === 'pwsh' || lower === 'ps') && activeShell !== 'ps') {
         setShellMode('ps');
+        labContext.activeShell = 'ps';
+        setCurrentPrompt(getPromptString(labContext, 'ps'));
+        setToastMessage('Switched to PowerShell');
         setEntries((prev) => [
           ...prev,
           {
             id: `in-${Date.now()}`,
             type: 'input',
-            shell: 'cmd',
+            shell: activeShell,
             prompt: promptStr,
             commandText: trimmed,
-            timestamp: Date.now(),
-          },
-          {
-            id: `out-${Date.now()}`,
-            type: 'output',
-            shell: 'ps',
-            output:
-              'Microsoft PS [Version 10.0]\nDeveloped by Dilip Kumar\n',
             timestamp: Date.now(),
           },
         ]);
@@ -225,27 +294,19 @@ export default function App() {
         return;
       }
 
-      if (
-        activeShell === 'ps' &&
-        (trimmed.toLowerCase() === 'exit' || trimmed.toLowerCase() === 'cmd')
-      ) {
+      if (lower === 'cmd' && activeShell !== 'cmd') {
         setShellMode('cmd');
+        labContext.activeShell = 'cmd';
+        setCurrentPrompt(getPromptString(labContext, 'cmd'));
+        setToastMessage('Switched to CMD');
         setEntries((prev) => [
           ...prev,
           {
             id: `in-${Date.now()}`,
             type: 'input',
-            shell: 'ps',
+            shell: activeShell,
             prompt: promptStr,
             commandText: trimmed,
-            timestamp: Date.now(),
-          },
-          {
-            id: `out-${Date.now()}`,
-            type: 'output',
-            shell: 'cmd',
-            output:
-              'Microsoft CMD [Version 10.0]\nDeveloped by Dilip Kumar\n',
             timestamp: Date.now(),
           },
         ]);
@@ -253,65 +314,155 @@ export default function App() {
         return;
       }
 
-      // Execute via appropriate engine
-      if (activeShell === 'ps') {
-        const result = defaultPSEngine.execute(trimmed, labContext);
-        
-        saveLabState(labContext);
-        setLabContext(loadLabState() || labContext);
-
-        if (result.clearScreen) {
-          setEntries((prev) => prev.filter((e) => e.shell !== 'ps'));
-        } else {
-          const inputEntry: TerminalEntry = {
+      if ((lower === 'bash' || lower === 'sh' || lower === 'wsl') && activeShell !== 'bash') {
+        setShellMode('bash');
+        labContext.activeShell = 'bash';
+        setCurrentPrompt(getPromptString(labContext, 'bash'));
+        setToastMessage('Switched to Bash');
+        setEntries((prev) => [
+          ...prev,
+          {
             id: `in-${Date.now()}`,
             type: 'input',
-            shell: 'ps',
+            shell: activeShell,
             prompt: promptStr,
             commandText: trimmed,
             timestamp: Date.now(),
-          };
-          const outputEntry: TerminalEntry | null = result.text
-            ? {
-                id: `out-${Date.now()}`,
-                type: result.error ? 'error' : 'output',
-                shell: 'ps',
-                output: result.text,
-                timestamp: Date.now(),
-              }
-            : null;
+          },
+        ]);
+        setCmdInput('');
+        return;
+      }
 
-          setEntries((prev) => (outputEntry ? [...prev, inputEntry, outputEntry] : [...prev, inputEntry]));
-        }
-      } else {
-        const result = executeCommand(trimmed, labContext);
-        
-        saveLabState(labContext);
-        setLabContext(loadLabState() || labContext);
-
-        if (result.clearScreen) {
-          setEntries((prev) => prev.filter((e) => e.shell !== 'cmd'));
-        } else {
-          const inputEntry: TerminalEntry = {
+      if (lower === 'exit' && activeShell !== 'cmd') {
+        setShellMode('cmd');
+        labContext.activeShell = 'cmd';
+        setCurrentPrompt(getPromptString(labContext, 'cmd'));
+        setToastMessage('Switched to CMD');
+        setEntries((prev) => [
+          ...prev,
+          {
             id: `in-${Date.now()}`,
             type: 'input',
-            shell: 'cmd',
+            shell: activeShell,
             prompt: promptStr,
             commandText: trimmed,
             timestamp: Date.now(),
-          };
-          const outputEntry: TerminalEntry | null = result.text
-            ? {
-                id: `out-${Date.now()}`,
-                type: result.error ? 'error' : 'output',
-                shell: 'cmd',
-                output: result.text,
-                timestamp: Date.now(),
-              }
-            : null;
+          },
+        ]);
+        setCmdInput('');
+        return;
+      }
 
-          setEntries((prev) => (outputEntry ? [...prev, inputEntry, outputEntry] : [...prev, inputEntry]));
+      // Execute via appropriate engine with robust sandbox error boundaries
+      try {
+        if (activeShell === 'ps') {
+          const result = defaultPSEngine.execute(trimmed, labContext);
+          
+          saveLabState(labContext);
+          notifyLabMutation();
+
+          if (result.clearScreen) {
+            setEntries((prev) => prev.filter((e) => e.shell !== 'ps'));
+          } else {
+            const inputEntry: TerminalEntry = {
+              id: `in-${Date.now()}`,
+              type: 'input',
+              shell: 'ps',
+              prompt: promptStr,
+              commandText: trimmed,
+              timestamp: Date.now(),
+            };
+            const outputEntry: TerminalEntry | null = result.text
+              ? {
+                  id: `out-${Date.now()}`,
+                  type: result.error ? 'error' : 'output',
+                  shell: 'ps',
+                  output: result.text,
+                  timestamp: Date.now(),
+                }
+              : null;
+
+            setEntries((prev) => (outputEntry ? [...prev, inputEntry, outputEntry] : [...prev, inputEntry]));
+          }
+        } else if (activeShell === 'bash') {
+          const result = executeBashCommand(trimmed, labContext);
+          
+          saveLabState(labContext);
+          notifyLabMutation();
+
+          if (result.clearScreen) {
+            setEntries((prev) => prev.filter((e) => e.shell !== 'bash'));
+          } else {
+            const inputEntry: TerminalEntry = {
+              id: `in-${Date.now()}`,
+              type: 'input',
+              shell: 'bash',
+              prompt: promptStr,
+              commandText: trimmed,
+              timestamp: Date.now(),
+            };
+
+            const outputEntry: TerminalEntry | null = result.text
+              ? {
+                  id: `out-${Date.now()}`,
+                  type: result.error ? 'error' : 'output',
+                  shell: 'bash',
+                  output: result.text,
+                  timestamp: Date.now(),
+                }
+              : null;
+
+            setEntries((prev) => (outputEntry ? [...prev, inputEntry, outputEntry] : [...prev, inputEntry]));
+          }
+        } else {
+          const result = executeCommand(trimmed, labContext);
+          
+          saveLabState(labContext);
+          notifyLabMutation();
+
+          if (result.clearScreen) {
+            setEntries((prev) => prev.filter((e) => e.shell !== 'cmd'));
+          } else {
+            const inputEntry: TerminalEntry = {
+              id: `in-${Date.now()}`,
+              type: 'input',
+              shell: 'cmd',
+              prompt: promptStr,
+              commandText: trimmed,
+              timestamp: Date.now(),
+            };
+            const outputEntry: TerminalEntry | null = result.text
+              ? {
+                  id: `out-${Date.now()}`,
+                  type: result.error ? 'error' : 'output',
+                  shell: 'cmd',
+                  output: result.text,
+                  timestamp: Date.now(),
+                }
+              : null;
+
+            setEntries((prev) => (outputEntry ? [...prev, inputEntry, outputEntry] : [...prev, inputEntry]));
+          }
         }
+      } catch (err: any) {
+        // Prevent unhandled engine errors from interrupting terminal session
+        const inputEntry: TerminalEntry = {
+          id: `in-${Date.now()}`,
+          type: 'input',
+          shell: activeShell,
+          prompt: promptStr,
+          commandText: trimmed,
+          timestamp: Date.now(),
+        };
+        const errorEntry: TerminalEntry = {
+          id: `err-${Date.now()}`,
+          type: 'error',
+          shell: activeShell,
+          output: `Command error: ${err?.message || 'Unexpected simulator exception'}`,
+          timestamp: Date.now(),
+        };
+        setEntries((prev) => [...prev, inputEntry, errorEntry]);
       }
 
       setCurrentPrompt(getPromptString(labContext, shellMode));
@@ -322,32 +473,60 @@ export default function App() {
 
   const handleSubmit = (e?: FormEvent) => {
     if (e) e.preventDefault();
+    const termInput = document.getElementById('terminal-input') as HTMLInputElement | null;
+    termInput?.blur();
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     runCommand(cmdInput);
   };
 
   // Switch mode via header toggle
-  const handleSwitchMode = (newMode: 'cmd' | 'ps') => {
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
+  const handleSwitchMode = (newMode: ShellMode) => {
     if (newMode === shellMode) return;
     setShellMode(newMode);
+    labContext.activeShell = newMode;
     setCurrentPrompt(getPromptString(labContext, newMode));
-    const cwd = labContext.vfs.getCwd();
-    setEntries((prev) => {
-      // Filter out previous session active notifications to prevent stacking
-      const filtered = prev.filter((e) => !(e.type === 'system' && e.output.includes('Session active')));
-      return [
-        ...filtered,
-        {
-          id: `mode-switch-${Date.now()}`,
-          type: 'system',
-          shell: newMode,
-          output:
-            newMode === 'ps'
-              ? `Switched to Windows PowerShell (Session active in ${cwd})`
-              : `Switched to Command Prompt (Session active in ${cwd})`,
-          timestamp: Date.now(),
-        },
-      ];
-    });
+    const modeName = newMode === 'ps' ? 'PowerShell' : newMode === 'bash' ? 'Bash' : 'CMD';
+    setToastMessage(`Switched to ${modeName}`);
+  };
+
+  // Quick Command selection from chips bar
+  const handleQuickCommand = (cmd: string) => {
+    // 1. Clear screen commands execute immediately
+    if (cmd === 'cls' || cmd === 'clear' || cmd === 'Clear-Host') {
+      runCommand(cmd);
+      setCmdInput('');
+      return;
+    }
+
+    // 2. Argument-requiring commands: populate input and focus cursor at end
+    const argCommands = ['mkdir', 'sudo', 'grep', 'cd', 'cat', 'rm', 'touch', 'echo', 'kill'];
+    if (argCommands.includes(cmd.toLowerCase())) {
+      const text = `${cmd} `;
+      setCmdInput(text);
+      setTimeout(() => {
+        const inputEl = document.getElementById('terminal-input') as HTMLInputElement | null;
+        if (inputEl) {
+          inputEl.focus();
+          inputEl.setSelectionRange(text.length, text.length);
+        }
+      }, 50);
+      return;
+    }
+
+    // 3. Self-contained commands: execute immediately
+    runCommand(cmd);
+    setCmdInput('');
   };
 
   // Tap-to-reuse previous command
@@ -378,17 +557,6 @@ export default function App() {
     document.getElementById('terminal-input')?.focus();
   };
 
-  const handleSelectGuideCommand = (command: string, targetShell: 'cmd' | 'ps') => {
-    handleCloseCommands();
-    if (targetShell !== shellMode) {
-      handleSwitchMode(targetShell);
-    }
-    setCmdInput(command);
-    setTimeout(() => {
-      document.getElementById('terminal-input')?.focus();
-    }, 150);
-  };
-
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -396,23 +564,6 @@ export default function App() {
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       handleHistoryNext();
-    } else if (e.key === 'Tab') {
-      e.preventDefault();
-      const parts = cmdInput.split(' ');
-      const lastPart = parts[parts.length - 1];
-      if (lastPart) {
-        const cwd = labContext.vfs.getCwd();
-        const nodeLookup = labContext.vfs.getNodeResult(cwd);
-        if (nodeLookup && nodeLookup.node.type === 'dir') {
-          const children = Object.keys(nodeLookup.node.children);
-          const matches = children.filter((c) => c.toLowerCase().startsWith(lastPart.toLowerCase()));
-          if (matches.length > 0) {
-            // Very simple autocomplete: complete to first match
-            parts[parts.length - 1] = matches[0];
-            setCmdInput(parts.join(' '));
-          }
-        }
-      }
     }
   };
 
@@ -422,11 +573,33 @@ export default function App() {
     clearLabState();
     const newContext = new LabContext();
     setLabContext(newContext);
-    setCurrentPrompt(newContext.vfs.getCwd());
+    setCurrentPrompt(getPromptString(newContext, shellMode));
     setCommandHistory([]);
     setHistoryPointer(-1);
     setCmdInput('');
+    setStreamedIds(new Set());
     setEntries([
+      {
+        id: `init-header-cmd-${Date.now()}`,
+        type: 'output',
+        shell: 'cmd',
+        output: getShellBanner('cmd'),
+        timestamp: Date.now(),
+      },
+      {
+        id: `init-header-ps-${Date.now()}`,
+        type: 'output',
+        shell: 'ps',
+        output: getShellBanner('ps'),
+        timestamp: Date.now(),
+      },
+      {
+        id: `init-header-bash-${Date.now()}`,
+        type: 'output',
+        shell: 'bash',
+        output: getShellBanner('bash'),
+        timestamp: Date.now(),
+      },
       {
         id: `reset-header-${Date.now()}`,
         type: 'system',
@@ -435,39 +608,50 @@ export default function App() {
           '[System]: Virtual Machine & File System have been reset to clean default baseline (Phase 1).',
         timestamp: Date.now(),
       },
-      {
-        id: `welcome-cmd-${Date.now()}`,
-        type: 'output',
-        shell: 'cmd',
-        output: 'Microsoft CMD [Version 10.0]\nDeveloped by Dilip Kumar',
-        timestamp: Date.now(),
-      },
-      {
-        id: `welcome-ps-${Date.now()}`,
-        type: 'output',
-        shell: 'ps',
-        output: 'Microsoft PS [Version 10.0]\nDeveloped by Dilip Kumar',
-        timestamp: Date.now(),
-      }
     ]);
   };
 
+  // Ensure that only ONE banner exists per shell across entries so it never stacks up
+  const activeEntries = useMemo(() => {
+    const list = entries.filter((e) => e.shell === shellMode);
+    let bannerSeen = false;
+    return list.filter((e) => {
+      const isBanner =
+        e.output === getShellBanner('cmd') ||
+        e.output === getShellBanner('ps') ||
+        e.output === getShellBanner('bash') ||
+        e.id.startsWith('init-header-');
+      if (isBanner) {
+        if (bannerSeen) return false;
+        bannerSeen = true;
+      }
+      return true;
+    });
+  }, [entries, shellMode]);
+
   const isPS = shellMode === 'ps';
+  const isBash = shellMode === 'bash';
   const colors = getTerminalColors(labContext.terminalColor, isPS);
+
+  const [isBooting, setIsBooting] = useState(true);
 
   return (
     <div
-      className={`h-[100dvh] max-h-[100dvh] w-full flex flex-col overflow-hidden font-mono select-text transition-colors ${
-        !colors.bg ? (isPS ? 'bg-[#012456]' : 'bg-[#0c0c0c]') : ''
-      }`}
-      style={colors.bg ? { backgroundColor: colors.bg } : undefined}
+      id="terminal-app-root"
+      style={{
+        height: viewportHeight ? `${viewportHeight}px` : '100dvh',
+        maxHeight: viewportHeight ? `${viewportHeight}px` : '100dvh',
+      }}
+      className="w-full flex flex-col overflow-hidden font-mono select-text bg-[#0B0D10] text-[#cccccc] fixed top-0 left-0 right-0 z-0"
     >
+      {isBooting && <BootScreen onComplete={() => setIsBooting(false)} />}
+      
       {/* Real Windows-styled Terminal Header */}
       <ShellHeader
         shellMode={shellMode}
         onSwitchMode={handleSwitchMode}
         onOpenReset={handleOpenReset}
-        onOpenCommands={handleOpenCommands}
+        toastMessage={toastMessage}
       />
 
       {/* Dismissible First-Time PWA Install Prompt Banner */}
@@ -475,7 +659,7 @@ export default function App() {
 
       {/* Primary Authentic Terminal Output Viewport */}
       <TerminalScreen
-        entries={entries.filter((e) => e.shell === shellMode)}
+        entries={activeEntries}
         shellMode={shellMode}
         currentPrompt={currentPrompt}
         terminalColors={colors}
@@ -484,6 +668,8 @@ export default function App() {
         onSubmit={handleSubmit}
         onReuseCommand={handleReuseCommand}
         onKeyDown={handleKeyDown}
+        streamedIds={streamedIds}
+        onMarkStreamed={handleMarkStreamed}
       />
 
       {/* Sticky Bottom Touch Input Bar (now just Quick Chips & History) */}
@@ -493,7 +679,7 @@ export default function App() {
         onHistoryNext={handleHistoryNext}
         canHistoryPrev={commandHistory.length > 0 && historyPointer !== 0}
         canHistoryNext={historyPointer !== -1}
-        onQuickCommand={(cmd) => runCommand(cmd)}
+        onQuickCommand={handleQuickCommand}
       />
 
       {/* Safe Reset Lab Confirmation Modal */}
@@ -501,14 +687,6 @@ export default function App() {
         isOpen={isResetModalOpen}
         onClose={handleCloseReset}
         onConfirm={handleResetLab}
-      />
-
-      {/* Interactive Command Reference & Practice Guide Modal */}
-      <CommandGuideModal
-        isOpen={isCommandGuideOpen}
-        onClose={handleCloseCommands}
-        onSelectCommand={handleSelectGuideCommand}
-        activeShell={shellMode}
       />
 
       {/* Unobtrusive Working Offline & Device Saved Indicator */}

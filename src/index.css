@@ -1,20 +1,41 @@
 @import "tailwindcss";
 
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+  background-color: #0B0D10;
+  touch-action: manipulation;
+}
+
+body {
+  font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+}
+
 /* Custom authentic terminal scrollbar */
 ::-webkit-scrollbar {
   width: 5px;
   height: 3px;
 }
-
 ::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.2);
 }
-
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 9999px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(52, 211, 153, 0.4);
 }
@@ -24,21 +45,17 @@
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
-
 .slim-scrollbar::-webkit-scrollbar {
   height: 3px;
   width: 3px;
 }
-
 .slim-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
-
 .slim-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.18);
   border-radius: 9999px;
 }
-
 .slim-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(52, 211, 153, 0.5);
 }
@@ -50,8 +67,28 @@ button {
 
 /* Authentic terminal block cursor */
 .terminal-caret {
-  caret-shape: block;
+  caret-color: currentColor;
 }
 
-/* Fallback for older browsers: thick underline or block if possible, but standard caret otherwise */
+@keyframes terminal-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
 
+.terminal-block-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1.1em;
+  background-color: currentColor;
+  vertical-align: middle;
+  animation: terminal-blink 1s step-end infinite;
+  margin-left: 2px;
+}
+
+@keyframes highlight-flash {
+  0% { background-color: rgba(255, 255, 255, 0.15); }
+  100% { background-color: transparent; }
+}
+.flash-highlight {
+  animation: highlight-flash 0.6s ease-out;
+}

@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, HardDrive, WifiOff, X } from 'lucide-react';
 import { useState } from 'react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
