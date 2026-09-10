@@ -144,9 +144,23 @@ export function splitPipeline(line: string): string[] {
   let inQuotes = false;
   let quoteChar = '';
   let braceDepth = 0;
+  let escaped = false;
 
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
+
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+
+    // PowerShell backtick or standard backslash escape
+    if ((char === '`' || char === '\\') && (inQuotes || braceDepth > 0)) {
+      escaped = true;
+      current += char;
+      continue;
+    }
 
     if (!inQuotes && (char === '"' || char === "'")) {
       inQuotes = true;

@@ -4,9 +4,8 @@
  */
 import { FormEvent, useCallback, useEffect, useState, useRef, KeyboardEvent, useMemo } from 'react';
 import { BootScreen } from './components/BootScreen';
-import { CommandInputBar } from './components/CommandInputBar';
+import { ShellBottomBar } from './components/ShellBottomBar';
 import { OfflineIndicator } from './components/OfflineIndicator';
-import { PWAInstallPromptBanner } from './components/PWAInstallPromptBanner';
 import { ResetModal } from './components/ResetModal';
 import { ShellHeader } from './components/ShellHeader';
 import { TerminalScreen } from './components/TerminalScreen';
@@ -14,19 +13,28 @@ import { executeCommand } from './engine/commands/registry';
 import { LabContext } from './engine/context';
 import { defaultPSEngine } from './engine/powershell/pipeline';
 import { executeBashCommand } from './engine/bash/bashEngine';
-import { TerminalEntry, ShellMode } from './types/terminal';
+import { TerminalEntry, ShellMode, getShellBanner } from './types/terminal';
 import { getTerminalColors } from './utils/colors';
 import { clearLabState, loadLabState, saveLabState } from './utils/storage';
+import { generateTerminalEntryId } from './utils/id';
 
-export function getShellBanner(mode: ShellMode): string {
-  switch (mode) {
-    case 'cmd':
-      return 'Microsoft CMD [Version 10.0]\nDeveloped by Dilip Kumar KV';
-    case 'ps':
-      return 'Microsoft PS [Version 10.0]\nDeveloped by Dilip Kumar KV';
-    case 'bash':
-      return 'Linux bash [Version 5.1.16]\nDeveloped by Dilip Kumar KV';
+export { getShellBanner };
+
+const MAX_TERMINAL_ENTRIES = 300;
+
+/**
+ * Appends entries to terminal while enforcing a FIFO buffer limit.
+ * Keeps initial shell header banners intact so memory and DOM rendering stay fast.
+ */
+function appendTerminalEntries(prev: TerminalEntry[], newEntries: TerminalEntry[]): TerminalEntry[] {
+  const combined = [...prev, ...newEntries];
+  if (combined.length <= MAX_TERMINAL_ENTRIES) {
+    return combined;
   }
+  const headers = combined.filter((e) => e.id.startsWith('init-header-'));
+  const nonHeaders = combined.filter((e) => !e.id.startsWith('init-header-'));
+  const prunedNonHeaders = nonHeaders.slice(-MAX_TERMINAL_ENTRIES);
+  return [...headers, ...prunedNonHeaders];
 }
 
 export default function App() {
@@ -238,6 +246,15 @@ export default function App() {
   ]);
 
   const [streamedIds, setStreamedIds] = useState<Set<string>>(() => new Set());
+  const [switchCount, setSwitchCount] = useState(0);
+  const prevShellRef = useRef(shellMode);
+
+  useEffect(() => {
+    if (prevShellRef.current !== shellMode) {
+      prevShellRef.current = shellMode;
+      setSwitchCount((c) => c + 1);
+    }
+  }, [shellMode]);
 
   const handleMarkStreamed = useCallback((id: string) => {
     setStreamedIds((prev) => {
@@ -279,17 +296,18 @@ export default function App() {
         labContext.activeShell = 'ps';
         setCurrentPrompt(getPromptString(labContext, 'ps'));
         setToastMessage('Switched to PowerShell');
-        setEntries((prev) => [
-          ...prev,
-          {
-            id: `in-${Date.now()}`,
-            type: 'input',
-            shell: activeShell,
-            prompt: promptStr,
-            commandText: trimmed,
-            timestamp: Date.now(),
-          },
-        ]);
+        setEntries((prev) =>
+          appendTerminalEntries(prev, [
+            {
+              id: generateTerminalEntryId('in'),
+              type: 'input',
+              shell: activeShell,
+              prompt: promptStr,
+              commandText: trimmed,
+              timestamp: Date.now(),
+            },
+          ])
+        );
         setCmdInput('');
         return;
       }
@@ -299,17 +317,18 @@ export default function App() {
         labContext.activeShell = 'cmd';
         setCurrentPrompt(getPromptString(labContext, 'cmd'));
         setToastMessage('Switched to CMD');
-        setEntries((prev) => [
-          ...prev,
-          {
-            id: `in-${Date.now()}`,
-            type: 'input',
-            shell: activeShell,
-            prompt: promptStr,
-            commandText: trimmed,
-            timestamp: Date.now(),
-          },
-        ]);
+        setEntries((prev) =>
+          appendTerminalEntries(prev, [
+            {
+              id: generateTerminalEntryId('in'),
+              type: 'input',
+              shell: activeShell,
+              prompt: promptStr,
+              commandText: trimmed,
+              timestamp: Date.now(),
+            },
+          ])
+        );
         setCmdInput('');
         return;
       }
@@ -319,17 +338,18 @@ export default function App() {
         labContext.activeShell = 'bash';
         setCurrentPrompt(getPromptString(labContext, 'bash'));
         setToastMessage('Switched to Bash');
-        setEntries((prev) => [
-          ...prev,
-          {
-            id: `in-${Date.now()}`,
-            type: 'input',
-            shell: activeShell,
-            prompt: promptStr,
-            commandText: trimmed,
-            timestamp: Date.now(),
-          },
-        ]);
+        setEntries((prev) =>
+          appendTerminalEntries(prev, [
+            {
+              id: generateTerminalEntryId('in'),
+              type: 'input',
+              shell: activeShell,
+              prompt: promptStr,
+              commandText: trimmed,
+              timestamp: Date.now(),
+            },
+          ])
+        );
         setCmdInput('');
         return;
       }
@@ -339,17 +359,18 @@ export default function App() {
         labContext.activeShell = 'cmd';
         setCurrentPrompt(getPromptString(labContext, 'cmd'));
         setToastMessage('Switched to CMD');
-        setEntries((prev) => [
-          ...prev,
-          {
-            id: `in-${Date.now()}`,
-            type: 'input',
-            shell: activeShell,
-            prompt: promptStr,
-            commandText: trimmed,
-            timestamp: Date.now(),
-          },
-        ]);
+        setEntries((prev) =>
+          appendTerminalEntries(prev, [
+            {
+              id: generateTerminalEntryId('in'),
+              type: 'input',
+              shell: activeShell,
+              prompt: promptStr,
+              commandText: trimmed,
+              timestamp: Date.now(),
+            },
+          ])
+        );
         setCmdInput('');
         return;
       }
@@ -366,7 +387,7 @@ export default function App() {
             setEntries((prev) => prev.filter((e) => e.shell !== 'ps'));
           } else {
             const inputEntry: TerminalEntry = {
-              id: `in-${Date.now()}`,
+              id: generateTerminalEntryId('in'),
               type: 'input',
               shell: 'ps',
               prompt: promptStr,
@@ -375,7 +396,7 @@ export default function App() {
             };
             const outputEntry: TerminalEntry | null = result.text
               ? {
-                  id: `out-${Date.now()}`,
+                  id: generateTerminalEntryId(result.error ? 'err' : 'out'),
                   type: result.error ? 'error' : 'output',
                   shell: 'ps',
                   output: result.text,
@@ -383,7 +404,9 @@ export default function App() {
                 }
               : null;
 
-            setEntries((prev) => (outputEntry ? [...prev, inputEntry, outputEntry] : [...prev, inputEntry]));
+            setEntries((prev) =>
+              appendTerminalEntries(prev, outputEntry ? [inputEntry, outputEntry] : [inputEntry])
+            );
           }
         } else if (activeShell === 'bash') {
           const result = executeBashCommand(trimmed, labContext);
@@ -395,7 +418,7 @@ export default function App() {
             setEntries((prev) => prev.filter((e) => e.shell !== 'bash'));
           } else {
             const inputEntry: TerminalEntry = {
-              id: `in-${Date.now()}`,
+              id: generateTerminalEntryId('in'),
               type: 'input',
               shell: 'bash',
               prompt: promptStr,
@@ -405,7 +428,7 @@ export default function App() {
 
             const outputEntry: TerminalEntry | null = result.text
               ? {
-                  id: `out-${Date.now()}`,
+                  id: generateTerminalEntryId(result.error ? 'err' : 'out'),
                   type: result.error ? 'error' : 'output',
                   shell: 'bash',
                   output: result.text,
@@ -413,7 +436,9 @@ export default function App() {
                 }
               : null;
 
-            setEntries((prev) => (outputEntry ? [...prev, inputEntry, outputEntry] : [...prev, inputEntry]));
+            setEntries((prev) =>
+              appendTerminalEntries(prev, outputEntry ? [inputEntry, outputEntry] : [inputEntry])
+            );
           }
         } else {
           const result = executeCommand(trimmed, labContext);
@@ -425,7 +450,7 @@ export default function App() {
             setEntries((prev) => prev.filter((e) => e.shell !== 'cmd'));
           } else {
             const inputEntry: TerminalEntry = {
-              id: `in-${Date.now()}`,
+              id: generateTerminalEntryId('in'),
               type: 'input',
               shell: 'cmd',
               prompt: promptStr,
@@ -434,7 +459,7 @@ export default function App() {
             };
             const outputEntry: TerminalEntry | null = result.text
               ? {
-                  id: `out-${Date.now()}`,
+                  id: generateTerminalEntryId(result.error ? 'err' : 'out'),
                   type: result.error ? 'error' : 'output',
                   shell: 'cmd',
                   output: result.text,
@@ -442,13 +467,15 @@ export default function App() {
                 }
               : null;
 
-            setEntries((prev) => (outputEntry ? [...prev, inputEntry, outputEntry] : [...prev, inputEntry]));
+            setEntries((prev) =>
+              appendTerminalEntries(prev, outputEntry ? [inputEntry, outputEntry] : [inputEntry])
+            );
           }
         }
       } catch (err: any) {
         // Prevent unhandled engine errors from interrupting terminal session
         const inputEntry: TerminalEntry = {
-          id: `in-${Date.now()}`,
+          id: generateTerminalEntryId('in'),
           type: 'input',
           shell: activeShell,
           prompt: promptStr,
@@ -456,13 +483,13 @@ export default function App() {
           timestamp: Date.now(),
         };
         const errorEntry: TerminalEntry = {
-          id: `err-${Date.now()}`,
+          id: generateTerminalEntryId('err'),
           type: 'error',
           shell: activeShell,
           output: `Command error: ${err?.message || 'Unexpected simulator exception'}`,
           timestamp: Date.now(),
         };
-        setEntries((prev) => [...prev, inputEntry, errorEntry]);
+        setEntries((prev) => appendTerminalEntries(prev, [inputEntry, errorEntry]));
       }
 
       setCurrentPrompt(getPromptString(labContext, shellMode));
@@ -578,30 +605,31 @@ export default function App() {
     setHistoryPointer(-1);
     setCmdInput('');
     setStreamedIds(new Set());
+    setSwitchCount((c) => c + 1);
     setEntries([
       {
-        id: `init-header-cmd-${Date.now()}`,
+        id: generateTerminalEntryId('init'),
         type: 'output',
         shell: 'cmd',
         output: getShellBanner('cmd'),
         timestamp: Date.now(),
       },
       {
-        id: `init-header-ps-${Date.now()}`,
+        id: generateTerminalEntryId('init'),
         type: 'output',
         shell: 'ps',
         output: getShellBanner('ps'),
         timestamp: Date.now(),
       },
       {
-        id: `init-header-bash-${Date.now()}`,
+        id: generateTerminalEntryId('init'),
         type: 'output',
         shell: 'bash',
         output: getShellBanner('bash'),
         timestamp: Date.now(),
       },
       {
-        id: `reset-header-${Date.now()}`,
+        id: generateTerminalEntryId('reset'),
         type: 'system',
         shell: shellMode,
         output:
@@ -611,15 +639,36 @@ export default function App() {
     ]);
   };
 
-  // Ensure that only ONE banner exists per shell across entries so it never stacks up
+  // Ensure that only ONE banner exists per shell across entries and is always present at top
   const activeEntries = useMemo(() => {
     const list = entries.filter((e) => e.shell === shellMode);
+    const hasBanner = list.some(
+      (e) =>
+        e.output === getShellBanner(shellMode) ||
+        (e.output && e.output.includes('Developed by Dilip')) ||
+        e.id.startsWith(`init-header-${shellMode}`)
+    );
+
+    const fullList = hasBanner
+      ? list
+      : [
+          {
+            id: `init-header-${shellMode}`,
+            type: 'output' as const,
+            shell: shellMode,
+            output: getShellBanner(shellMode),
+            timestamp: Date.now(),
+          },
+          ...list,
+        ];
+
     let bannerSeen = false;
-    return list.filter((e) => {
+    return fullList.filter((e) => {
       const isBanner =
         e.output === getShellBanner('cmd') ||
         e.output === getShellBanner('ps') ||
         e.output === getShellBanner('bash') ||
+        (e.output && e.output.includes('Developed by Dilip')) ||
         e.id.startsWith('init-header-');
       if (isBanner) {
         if (bannerSeen) return false;
@@ -646,16 +695,17 @@ export default function App() {
     >
       {isBooting && <BootScreen onComplete={() => setIsBooting(false)} />}
       
-      {/* Real Windows-styled Terminal Header */}
+      {/* Top Dynamic Status Banner, Command Selection Strip with History, and Notification Strip */}
       <ShellHeader
         shellMode={shellMode}
-        onSwitchMode={handleSwitchMode}
+        onQuickCommand={handleQuickCommand}
         onOpenReset={handleOpenReset}
         toastMessage={toastMessage}
+        onHistoryPrev={handleHistoryPrev}
+        onHistoryNext={handleHistoryNext}
+        canHistoryPrev={commandHistory.length > 0 && historyPointer !== 0}
+        canHistoryNext={historyPointer !== -1}
       />
-
-      {/* Dismissible First-Time PWA Install Prompt Banner */}
-      <PWAInstallPromptBanner />
 
       {/* Primary Authentic Terminal Output Viewport */}
       <TerminalScreen
@@ -670,16 +720,14 @@ export default function App() {
         onKeyDown={handleKeyDown}
         streamedIds={streamedIds}
         onMarkStreamed={handleMarkStreamed}
+        isBooting={isBooting}
+        switchCount={switchCount}
       />
 
-      {/* Sticky Bottom Touch Input Bar (now just Quick Chips & History) */}
-      <CommandInputBar
+      {/* Bottom Terminal Switcher (Expanded to Max Space) & App Branding */}
+      <ShellBottomBar
         shellMode={shellMode}
-        onHistoryPrev={handleHistoryPrev}
-        onHistoryNext={handleHistoryNext}
-        canHistoryPrev={commandHistory.length > 0 && historyPointer !== 0}
-        canHistoryNext={historyPointer !== -1}
-        onQuickCommand={handleQuickCommand}
+        onSwitchMode={handleSwitchMode}
       />
 
       {/* Safe Reset Lab Confirmation Modal */}

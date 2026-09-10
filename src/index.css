@@ -65,6 +65,39 @@ button {
   touch-action: manipulation;
 }
 
+/* Authentic blueprint cyber-grid background */
+.cyber-grid {
+  background-color: #070B14;
+  background-image: 
+    linear-gradient(to right, rgba(56, 189, 248, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(56, 189, 248, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.cyber-grid-cmd {
+  background-color: #060A10;
+  background-image: 
+    linear-gradient(to right, rgba(16, 185, 129, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.cyber-grid-ps {
+  background-color: #070D1A;
+  background-image: 
+    linear-gradient(to right, rgba(56, 189, 248, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(56, 189, 248, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.cyber-grid-bash {
+  background-color: #0A0816;
+  background-image: 
+    linear-gradient(to right, rgba(217, 70, 239, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(217, 70, 239, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
 /* Authentic terminal block cursor */
 .terminal-caret {
   caret-color: currentColor;

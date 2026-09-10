@@ -45,16 +45,30 @@ function saveRedirection(
 }
 
 /**
- * Split command line by operator ('&&' or ';') respecting single and double quotes.
+ * Split command line by operator ('&&', ';', or '|') respecting single and double quotes and escapes.
  */
-function splitByOperator(line: string, op: '&&' | ';'): string[] {
+function splitByOperator(line: string, op: '&&' | ';' | '|'): string[] {
   const parts: string[] = [];
   let cur = '';
   let inDouble = false;
   let inSingle = false;
+  let escaped = false;
 
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
+
+    if (escaped) {
+      cur += ch;
+      escaped = false;
+      continue;
+    }
+
+    if (ch === '\\' && !inSingle) {
+      escaped = true;
+      cur += ch;
+      continue;
+    }
+
     if (ch === '"' && !inSingle) inDouble = !inDouble;
     if (ch === "'" && !inDouble) inSingle = !inSingle;
 
@@ -70,11 +84,84 @@ function splitByOperator(line: string, op: '&&' | ';'): string[] {
         cur = '';
         continue;
       }
+      if (op === '|' && ch === '|' && line.substring(i, i + 2) !== '||') {
+        parts.push(cur.trim());
+        cur = '';
+        continue;
+      }
     }
     cur += ch;
   }
   if (cur.trim()) parts.push(cur.trim());
   return parts;
+}
+
+/**
+ * Converts a simple glob wildcard (* and ?) pattern into a RegExp.
+ */
+function globToRegExp(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const regexStr = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
+  return new RegExp(`^${regexStr}$`);
+}
+
+/**
+ * Expands wildcard tokens (* and ?) across positional arguments against the virtual filesystem.
+ * If no matches occur, leaves the token untouched (standard Bash POSIX behavior).
+ */
+function expandBashGlobs(positional: string[], context: LabContext): string[] {
+  const expanded: string[] = [];
+
+  for (const token of positional) {
+    // Only process tokens with unquoted wildcards
+    if (!token.includes('*') && !token.includes('?')) {
+      expanded.push(token);
+      continue;
+    }
+
+    // Determine directory prefix and search pattern
+    const lastSlash = Math.max(token.lastIndexOf('/'), token.lastIndexOf('\\'));
+    let dirPrefix = '';
+    let pattern = token;
+
+    if (lastSlash !== -1) {
+      dirPrefix = token.substring(0, lastSlash + 1);
+      pattern = token.substring(lastSlash + 1);
+    }
+
+    // Resolve target directory in VFS
+    const currentCwd = context.vfs.getCwd();
+    const vfsTargetDir = dirPrefix ? toVfsPath(dirPrefix, currentCwd) : currentCwd;
+    const dirNodeRes = context.vfs.getNodeResult(vfsTargetDir);
+
+    if (!dirNodeRes || dirNodeRes.node.type !== 'dir') {
+      expanded.push(token);
+      continue;
+    }
+
+    const regex = globToRegExp(pattern);
+    const candidateNames = Object.keys(dirNodeRes.node.children);
+
+    const matches = candidateNames.filter((name) => {
+      // In POSIX shells, patterns not starting with '.' do not match hidden files
+      if (!pattern.startsWith('.') && name.startsWith('.')) {
+        return false;
+      }
+      return regex.test(name);
+    });
+
+    if (matches.length === 0) {
+      expanded.push(token);
+    } else {
+      // Sort matches alphabetically per standard shell globbing rules
+      matches.sort((a, b) => a.localeCompare(b));
+      for (const match of matches) {
+        expanded.push(dirPrefix ? `${dirPrefix}${match}` : match);
+      }
+    }
+  }
+
+  return expanded;
 }
 
 function runSingleBashCommand(
@@ -89,6 +176,9 @@ function runSingleBashCommand(
   if (!parsed.commandName) {
     return { error: false, text: '' };
   }
+
+  // Expand wildcards/globs in positional arguments
+  const expandedPositional = expandBashGlobs(parsed.positional, context);
 
   const handler = bashRegistry[parsed.commandName.toLowerCase()];
   if (!handler) {
@@ -115,7 +205,7 @@ function runSingleBashCommand(
   }
 
   try {
-    return handler(parsed.positional, parsed.flags, parsed.switches, context, trimmed, stdin);
+    return handler(expandedPositional, parsed.flags, parsed.switches, context, trimmed, stdin);
   } catch (err: any) {
     return {
       error: true,
@@ -125,11 +215,11 @@ function runSingleBashCommand(
 }
 
 /**
- * Executes a pipeline segment or single command (handling | pipe).
+ * Executes a pipeline segment or single command (handling | pipe with quote awareness).
  */
 function executePipeline(pipelineStr: string, context: LabContext): CommandResult {
-  if (pipelineStr.includes('|')) {
-    const stages = pipelineStr.split('|').map((s) => s.trim()).filter(Boolean);
+  const stages = splitByOperator(pipelineStr, '|');
+  if (stages.length > 1) {
     let currentInput: string | undefined = undefined;
     let finalResult: CommandResult = { error: false, text: '' };
 

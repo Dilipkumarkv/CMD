@@ -55,19 +55,19 @@ export function PWAInstallButton({ variant = 'header', shellMode = 'cmd' }: PWAI
         type="button"
         id="pwa-install-btn"
         onClick={handleInstallClick}
-        className="flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-[#012456]/40 hover:bg-[#012456]/80 active:scale-95 border border-sky-500/40 text-sky-300 hover:text-sky-100 transition-all text-xs font-mono focus-visible:ring-1 focus-visible:ring-sky-400"
+        className="flex items-center gap-1.5 h-7 px-2.5 rounded-md bg-[#012456]/40 hover:bg-[#012456]/80 active:scale-95 border border-sky-500/40 text-sky-300 hover:text-sky-100 transition-all text-xs font-mono focus-visible:ring-1 focus-visible:ring-sky-400"
         title={isActuallyInstalled ? "App Installed & Offline Ready" : "Install App Locally"}
         aria-label="Install App"
       >
         {isActuallyInstalled ? (
           <>
             <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-            <span className="hidden lg:inline text-[11px] text-sky-300 font-medium">Installed</span>
+            <span className="hidden sm:inline text-[10px] sm:text-[11px] text-sky-300 font-semibold">Installed</span>
           </>
         ) : (
           <>
             <Download className="w-3.5 h-3.5 text-sky-400" />
-            <span className="hidden lg:inline text-[11px] text-sky-300 font-medium">Install</span>
+            <span className="hidden sm:inline text-[10px] sm:text-[11px] text-sky-300 font-semibold">Install</span>
           </>
         )}
       </button>
@@ -103,7 +103,7 @@ export function PWAInstallButton({ variant = 'header', shellMode = 'cmd' }: PWAI
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-neutral-100">
-                      {isActuallyInstalled ? 'SNA Terminal Lab (PWA)' : 'Install SNA Terminal Lab'}
+                      {isActuallyInstalled ? 'SNA Terminal App (PWA)' : 'Install SNA Terminal App'}
                     </h3>
                     <p className="text-[11px] text-neutral-400">
                       {isActuallyInstalled ? 'Application is installed & offline ready' : 'Standalone Desktop & Mobile Experience'}
@@ -147,7 +147,7 @@ export function PWAInstallButton({ variant = 'header', shellMode = 'cmd' }: PWAI
                       Standalone Window Advantage
                     </div>
                     <p className="text-sky-200/90 leading-relaxed">
-                      SNA Terminal Lab runs as an independent application window without browser chrome. All curriculum exercises, simulated disks, services, and file system states remain saved on your device.
+                      SNA Terminal App runs as an independent application window without browser chrome. All curriculum exercises, simulated disks, services, and file system states remain saved on your device.
                     </p>
                   </div>
 
@@ -181,7 +181,7 @@ export function PWAInstallButton({ variant = 'header', shellMode = 'cmd' }: PWAI
                   )}
 
                   <p className="text-[11px] text-neutral-300 leading-relaxed">
-                    Install SNA Terminal Lab to run completely offline without an active internet connection, with full-screen window access and your practice state securely saved on this device.
+                    Install SNA Terminal App to run completely offline without an active internet connection, with full-screen window access and your practice state securely saved on this device.
                   </p>
 
                   {/* Device-Specific Steps */}

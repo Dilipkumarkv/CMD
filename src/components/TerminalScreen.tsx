@@ -1,10 +1,11 @@
 import { motion } from 'motion/react';
 import { AlertCircle, Copy, Info, Terminal, SendHorizontal, CornerDownLeft } from 'lucide-react';
-import { FormEvent, MouseEvent, useEffect, useState, KeyboardEvent, useCallback } from 'react';
-import { TerminalEntry, ShellMode } from '../types/terminal';
+import { FormEvent, MouseEvent, useEffect, useState, KeyboardEvent, useCallback, useRef } from 'react';
+import { TerminalEntry, ShellMode, getShellBanner } from '../types/terminal';
 import { formatTerminalOutput } from '../utils/formatOutput';
 import { useTypewriter } from '../hooks/useTypewriter';
 import { CommandExplainCard } from './CommandExplainCard';
+import { DeveloperBanner } from './DeveloperBanner';
 
 interface TerminalScreenProps {
   entries: TerminalEntry[];
@@ -18,6 +19,8 @@ interface TerminalScreenProps {
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
   streamedIds?: Set<string>;
   onMarkStreamed?: (id: string) => void;
+  isBooting?: boolean;
+  switchCount?: number;
 }
 
 function StreamedOutput({
@@ -60,29 +63,101 @@ export function TerminalScreen({
   onKeyDown,
   streamedIds,
   onMarkStreamed,
+  isBooting,
+  switchCount,
 }: TerminalScreenProps) {
   const isPS = shellMode === 'ps';
   const isBash = shellMode === 'bash';
   const isCMD = shellMode === 'cmd';
   const [flashedId, setFlashedId] = useState<string | null>(null);
   const [expandedExplainIds, setExpandedExplainIds] = useState<Record<string, boolean>>({});
+  const savedScrollPositions = useRef<Record<string, number>>({});
 
-  const toggleExplain = useCallback((cmdId: string) => {
-    setExpandedExplainIds((prev) => {
-      const isNowExpanded = !prev[cmdId];
-      if (isNowExpanded) {
-        setTimeout(() => {
-          const viewport = document.getElementById('terminal-scroll-area');
-          if (viewport) {
-            viewport.scrollTop = viewport.scrollHeight;
-          }
-        }, 120);
-      }
-      return { ...prev, [cmdId]: isNowExpanded };
-    });
+  const scrollToFitCard = useCallback((cmdId: string) => {
+    const viewport = document.getElementById('terminal-scroll-area');
+    const card = document.getElementById(`explain-card-${cmdId}`);
+    if (!viewport || !card) return;
+
+    const vRect = viewport.getBoundingClientRect();
+    const cRect = card.getBoundingClientRect();
+
+    const availableHeight = vRect.height;
+    const cardHeight = cRect.height;
+    const cardTopInContent = cRect.top - vRect.top + viewport.scrollTop;
+
+    // Case 1: If card is taller than or occupies most of viewport, align its top near viewport top
+    if (cardHeight >= availableHeight - 32) {
+      viewport.scrollTo({
+        top: Math.max(0, cardTopInContent - 10),
+        behavior: 'smooth',
+      });
+      return;
+    }
+
+    // Case 2: Ensure bottom of card and action buttons are fully visible with margin
+    const bottomPadding = 20;
+    const cardBottomVisible = cRect.bottom;
+    const viewportBottomEdge = vRect.bottom - bottomPadding;
+
+    if (cardBottomVisible > viewportBottomEdge) {
+      const overflow = cardBottomVisible - viewportBottomEdge;
+      viewport.scrollTo({
+        top: viewport.scrollTop + overflow,
+        behavior: 'smooth',
+      });
+    } else if (cRect.top < vRect.top + 8) {
+      // If card top was scrolled above viewport top edge
+      viewport.scrollTo({
+        top: Math.max(0, cardTopInContent - 8),
+        behavior: 'smooth',
+      });
+    }
   }, []);
 
-  // Auto-scroll to bottom on output change and when virtual keyboard closes/resizes
+  const toggleExplain = useCallback(
+    (cmdId: string) => {
+      const viewport = document.getElementById('terminal-scroll-area');
+
+      setExpandedExplainIds((prev) => {
+        const willBeExpanded = !prev[cmdId];
+
+        if (willBeExpanded) {
+          // Save current scroll position before expanding
+          if (viewport) {
+            savedScrollPositions.current[cmdId] = viewport.scrollTop;
+          }
+
+          // Initial smooth scroll push as card begins expanding
+          setTimeout(() => {
+            scrollToFitCard(cmdId);
+          }, 40);
+        }
+
+        return { ...prev, [cmdId]: willBeExpanded };
+      });
+    },
+    [scrollToFitCard]
+  );
+
+  const handleExpandedComplete = useCallback(
+    (cmdId: string) => {
+      scrollToFitCard(cmdId);
+    },
+    [scrollToFitCard]
+  );
+
+  const handleCollapsedComplete = useCallback((cmdId: string) => {
+    const viewport = document.getElementById('terminal-scroll-area');
+    const prevScrollTop = savedScrollPositions.current[cmdId];
+    if (viewport && typeof prevScrollTop === 'number') {
+      viewport.scrollTo({
+        top: prevScrollTop,
+        behavior: 'smooth',
+      });
+    }
+  }, []);
+
+  // Auto-scroll to bottom only when new command entries are added
   useEffect(() => {
     const scrollToBottom = () => {
       const viewport = document.getElementById('terminal-scroll-area');
@@ -94,17 +169,19 @@ export function TerminalScreen({
     scrollToBottom();
     const t1 = setTimeout(scrollToBottom, 60);
     const t2 = setTimeout(scrollToBottom, 180);
-    const t3 = setTimeout(scrollToBottom, 350);
 
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
-      clearTimeout(t3);
     };
-  }, [entries, inputValue]);
+  }, [entries]);
 
   useEffect(() => {
     const handleResize = () => {
+      // If an explain card is currently expanded, avoid snapping scroll to bottom
+      if (Object.values(expandedExplainIds).some(Boolean)) {
+        return;
+      }
       const viewport = document.getElementById('terminal-scroll-area');
       if (viewport) {
         viewport.scrollTop = viewport.scrollHeight;
@@ -112,26 +189,37 @@ export function TerminalScreen({
       const activeInput = document.getElementById('terminal-input');
       activeInput?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     };
+
     window.addEventListener('resize', handleResize);
     window.visualViewport?.addEventListener('resize', handleResize);
-    window.visualViewport?.addEventListener('scroll', handleResize);
+
     return () => {
       window.removeEventListener('resize', handleResize);
       window.visualViewport?.removeEventListener('resize', handleResize);
-      window.visualViewport?.removeEventListener('scroll', handleResize);
     };
-  }, []);
+  }, [expandedExplainIds]);
 
   const handleContainerClick = (e: MouseEvent<HTMLDivElement>) => {
-    // If selecting text or clicking buttons/interactive elements, don't hijack focus
+    // If selecting text or clicking buttons/interactive elements/explain cards, don't hijack focus
     const selection = window.getSelection();
     if (selection && selection.toString().length > 0) return;
     const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('input') || target.closest('a')) return;
+    if (
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('a') ||
+      target.closest('.explain-card') ||
+      target.closest('.explain-btn') ||
+      target.closest('[data-explain-card]')
+    ) {
+      return;
+    }
 
     const inputEl = document.getElementById('terminal-input') as HTMLInputElement | null;
     if (inputEl) {
       inputEl.focus();
+      const len = inputEl.value.length;
+      inputEl.setSelectionRange(len, len);
       const viewport = document.getElementById('terminal-scroll-area');
       if (viewport) {
         viewport.scrollTop = viewport.scrollHeight;
@@ -218,6 +306,9 @@ export function TerminalScreen({
                 className="explain-btn text-[10px] px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-sky-200 flex items-center gap-1 transition-colors font-mono cursor-pointer pointer-events-auto"
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur();
+                  }
                   toggleExplain(entry.id);
                 }}
                 title="Explain what this command does"
@@ -236,11 +327,14 @@ export function TerminalScreen({
           {/* If command produced no output, render explain card right under input */}
           {!hasFollowUpOutput && entry.commandText && !isExplainCmd && (
             <CommandExplainCard
+              id={`explain-card-${entry.id}`}
               commandText={entry.commandText}
               shellMode={entry.shell}
               isExpanded={!!expandedExplainIds[entry.id]}
               onToggle={() => toggleExplain(entry.id)}
               onReuseCommand={onReuseCommand}
+              onExpandedComplete={() => handleExpandedComplete(entry.id)}
+              onCollapsedComplete={() => handleCollapsedComplete(entry.id)}
             />
           )}
         </div>
@@ -275,13 +369,37 @@ export function TerminalScreen({
 
           {prevIsInput && !isExplainCmd && (
             <CommandExplainCard
+              id={`explain-card-${prevEntry.id}`}
               commandText={prevEntry.commandText!}
               shellMode={prevEntry.shell}
               isExpanded={!!expandedExplainIds[prevEntry.id]}
               onToggle={() => toggleExplain(prevEntry.id)}
               onReuseCommand={onReuseCommand}
+              onExpandedComplete={() => handleExpandedComplete(prevEntry.id)}
+              onCollapsedComplete={() => handleCollapsedComplete(prevEntry.id)}
             />
           )}
+        </div>
+      );
+    }
+
+    const isBanner =
+      entry.output === getShellBanner('cmd') ||
+      entry.output === getShellBanner('ps') ||
+      entry.output === getShellBanner('bash') ||
+      (entry.output && entry.output.includes('Developed by Dilip')) ||
+      entry.id.startsWith('init-header-');
+
+    if (isBanner) {
+      return (
+        <div key={`${entry.id}-${switchCount ?? 0}`} className="flex flex-col">
+          <DeveloperBanner
+            key={`banner-${entry.shell}-${switchCount ?? 0}`}
+            content={entry.output || ''}
+            shell={entry.shell}
+            isBooting={isBooting}
+            hasCustomColor={Boolean(terminalColors?.fg)}
+          />
         </div>
       );
     }
@@ -315,11 +433,14 @@ export function TerminalScreen({
 
         {prevIsInput && !isExplainCmd && (
           <CommandExplainCard
+            id={`explain-card-${prevEntry.id}`}
             commandText={prevEntry.commandText!}
             shellMode={prevEntry.shell}
             isExpanded={!!expandedExplainIds[prevEntry.id]}
             onToggle={() => toggleExplain(prevEntry.id)}
             onReuseCommand={onReuseCommand}
+            onExpandedComplete={() => handleExpandedComplete(prevEntry.id)}
+            onCollapsedComplete={() => handleCollapsedComplete(prevEntry.id)}
           />
         )}
       </div>
@@ -329,17 +450,26 @@ export function TerminalScreen({
   return (
     <main
       onClick={handleContainerClick}
-      className="flex-1 min-h-0 overflow-hidden p-2.5 sm:p-4 font-mono text-xs sm:text-sm bg-[#080A0D] text-[#cccccc] select-text relative cursor-text flex flex-col"
+      className={`flex-1 min-h-0 overflow-hidden font-mono text-xs sm:text-sm text-[#cccccc] select-text relative cursor-text flex flex-col ${
+        isCMD ? 'cyber-grid-cmd' : isPS ? 'cyber-grid-ps' : 'cyber-grid-bash'
+      }`}
     >
+      {/* Scrollable Command Output History Area */}
       <div
         id="terminal-scroll-area"
-        className="h-full w-full overflow-y-auto overflow-x-hidden break-words custom-scrollbar pr-1 pb-2 sm:pb-3"
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions text"
+        aria-label="Terminal command history and output log"
+        className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden break-words custom-scrollbar p-2.5 sm:p-4 pb-6"
       >
         <div className="flex flex-col space-y-1">
           {entries.map((entry, index) => renderEntry(index, entry))}
         </div>
+      </div>
 
-        {/* Live Active Command Prompt Line */}
+      {/* Live Active Command Prompt Line - Docked right above bottom terminal switcher */}
+      <div className="shrink-0 p-2 sm:px-4 sm:py-2.5 bg-[#060913]/95 border-t border-white/[0.08] backdrop-blur-md">
         <form
           onSubmit={(e) => {
             const termInput = document.getElementById('terminal-input') as HTMLInputElement | null;
@@ -349,46 +479,53 @@ export function TerminalScreen({
             }
             onSubmit(e);
           }}
-          className="group flex items-center gap-1.5 px-2 py-1.5 mt-3 w-full bg-black/20 rounded-md border border-white/[0.04] focus-within:border-white/[0.12] transition-colors"
+          className={`group flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:py-2 w-full bg-[#080D1A] rounded-lg border transition-all ${
+            isCMD
+              ? 'border-emerald-500/30 focus-within:border-emerald-400/70 focus-within:shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+              : isPS
+              ? 'border-sky-500/30 focus-within:border-sky-400/70 focus-within:shadow-[0_0_15px_rgba(56,189,248,0.15)]'
+              : 'border-fuchsia-500/30 focus-within:border-fuchsia-400/70 focus-within:shadow-[0_0_15px_rgba(217,70,239,0.15)]'
+          }`}
           onClick={(e) => {
             const target = e.target as HTMLElement;
             if (target.closest('button') || target.closest('input')) return;
-            document.getElementById('terminal-input')?.focus();
+            const inputEl = document.getElementById('terminal-input') as HTMLInputElement | null;
+            if (inputEl) {
+              inputEl.focus();
+              const len = inputEl.value.length;
+              inputEl.setSelectionRange(len, len);
+            }
           }}
         >
+          {/* Prompt Prefix */}
           <span
-            className={`font-semibold select-none whitespace-nowrap shrink-0 ${
-              isPS ? 'text-sky-300' : isBash ? 'text-fuchsia-300' : 'text-emerald-400'
+            id="terminal-prompt-prefix"
+            className={`font-bold select-none whitespace-nowrap shrink-0 text-xs sm:text-sm mr-1 ${
+              isCMD ? 'text-emerald-400' : isPS ? 'text-sky-400' : 'text-fuchsia-400'
             }`}
           >
             {currentPrompt}
           </span>
 
-          <input
-            id="terminal-input"
-            type="text"
-            value={inputValue}
-            onChange={(e) => onChangeInput(e.target.value)}
-            onKeyDown={onKeyDown}
-            onFocus={(e) => {
-              const target = e.target;
-              [40, 120, 250, 450].forEach((delay) => {
-                setTimeout(() => {
-                  target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                  const viewport = document.getElementById('terminal-scroll-area');
-                  if (viewport) {
-                    viewport.scrollTop = viewport.scrollHeight;
-                  }
-                }, delay);
-              });
-            }}
-            className="flex-1 min-w-0 bg-transparent border-none outline-none p-0 m-0 font-mono font-bold text-white placeholder-white/20 focus:ring-0 text-xs sm:text-sm terminal-caret"
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck="false"
-            aria-label="Terminal command input"
-          />
+          <div className="flex-1 flex items-center min-w-0">
+            <input
+              id="terminal-input"
+              type="text"
+              value={inputValue}
+              onChange={(e) => onChangeInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              className="w-full bg-transparent border-none outline-none p-0 m-0 font-mono font-bold text-white placeholder-white/20 focus:ring-0 text-xs sm:text-sm"
+              style={{
+                caretColor: isCMD ? '#34D399' : isPS ? '#38BDF8' : '#E879F9',
+              }}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck="false"
+              aria-label="Terminal command line input"
+              aria-describedby="terminal-prompt-prefix"
+            />
+          </div>
 
           {/* Desktop Enter hint / Mobile Action button */}
           <div className="flex items-center gap-1 shrink-0">

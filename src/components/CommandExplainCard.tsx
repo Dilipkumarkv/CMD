@@ -14,19 +14,25 @@ import { ShellMode } from '../types/terminal';
 import { getCommandDetails } from '../engine/explain';
 
 interface CommandExplainCardProps {
+  id?: string;
   commandText: string;
   shellMode: ShellMode;
   isExpanded: boolean;
   onToggle: () => void;
   onReuseCommand?: (cmd: string) => void;
+  onExpandedComplete?: () => void;
+  onCollapsedComplete?: () => void;
 }
 
 export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
+  id,
   commandText,
   shellMode,
   isExpanded,
   onToggle,
   onReuseCommand,
+  onExpandedComplete,
+  onCollapsedComplete,
 }) => {
   const [copied, setCopied] = useState(false);
   const details = React.useMemo(() => {
@@ -53,12 +59,11 @@ export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
 
   return (
     <div
-      className="my-1.5 rounded border border-sky-900/50 bg-[#0a1120]/80 transition-colors text-xs font-mono select-none overflow-hidden"
+      id={id}
+      data-explain-card="true"
+      className="explain-card my-1.5 rounded border border-sky-900/50 bg-[#0a1120]/80 transition-colors text-xs font-mono select-none overflow-hidden"
       onClick={(e) => {
-        // Prevent accidental trigger if text is selected
-        const selection = window.getSelection();
-        if (selection && selection.toString().length > 0) return;
-        onToggle();
+        e.stopPropagation();
       }}
     >
       {/* Collapsible Header Bar (Minimal space when collapsed) */}
@@ -66,9 +71,21 @@ export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
         role="button"
         tabIndex={0}
         aria-expanded={isExpanded}
+        onClick={(e) => {
+          e.stopPropagation();
+          // Blur any active input so virtual keyboard closes and doesn't obscure the card
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+          onToggle();
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
+            e.stopPropagation();
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
             onToggle();
           }
         }}
@@ -100,14 +117,20 @@ export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
       </div>
 
       {/* Expanded Dialogue Box Content */}
-      <AnimatePresence initial={false}>
+      <AnimatePresence initial={false} onExitComplete={onCollapsedComplete}>
         {isExpanded && (
           <motion.div
+            data-explain-content="true"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18, ease: 'easeInOut' }}
-            className="border-t border-sky-900/40 bg-[#060b14] p-3 text-neutral-300 space-y-2.5 select-text cursor-auto"
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+            onAnimationComplete={() => {
+              if (isExpanded) {
+                onExpandedComplete?.();
+              }
+            }}
+            className="border-t border-sky-900/40 bg-[#060b14] p-3 text-neutral-300 space-y-2.5 select-text cursor-auto max-h-[min(65vh,420px)] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Function / Operation Purpose */}
