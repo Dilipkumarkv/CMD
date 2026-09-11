@@ -24,6 +24,62 @@ interface CommandExplainCardProps {
   onCollapsedComplete?: () => void;
 }
 
+interface ShellTheme {
+  cardBorderBg: string;
+  headerHover: string;
+  chevron: string;
+  title: string;
+  badge: string;
+  hintText: string;
+  expandedPanel: string;
+  sectionHeader: string;
+  syntaxBox: string;
+  exampleHighlight: string;
+  tryButton: string;
+}
+
+const SHELL_THEMES: Record<ShellMode, ShellTheme> = {
+  cmd: {
+    cardBorderBg: 'border-emerald-500/30 bg-[#041108]/90 hover:border-emerald-500/50 shadow-[0_2px_12px_rgba(16,185,129,0.06)]',
+    headerHover: 'hover:bg-emerald-950/40 active:bg-emerald-950/70',
+    chevron: 'text-emerald-400',
+    title: 'text-emerald-200',
+    badge: 'bg-emerald-950/80 text-emerald-300 border-emerald-700/50',
+    hintText: 'text-emerald-400/80',
+    expandedPanel: 'border-t border-emerald-900/50 bg-[#020b05]',
+    sectionHeader: 'text-emerald-400',
+    syntaxBox: 'bg-[#010603] border border-emerald-900/40 text-emerald-200',
+    exampleHighlight: 'text-emerald-300',
+    tryButton: 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow-sm shadow-emerald-950',
+  },
+  ps: {
+    cardBorderBg: 'border-sky-500/30 bg-[#071120]/90 hover:border-sky-500/50 shadow-[0_2px_12px_rgba(14,165,233,0.06)]',
+    headerHover: 'hover:bg-sky-950/40 active:bg-sky-950/70',
+    chevron: 'text-sky-400',
+    title: 'text-sky-200',
+    badge: 'bg-sky-950/80 text-sky-300 border-sky-700/50',
+    hintText: 'text-sky-400/80',
+    expandedPanel: 'border-t border-sky-900/50 bg-[#040a14]',
+    sectionHeader: 'text-sky-400',
+    syntaxBox: 'bg-[#02060d] border border-sky-900/40 text-sky-200',
+    exampleHighlight: 'text-sky-300',
+    tryButton: 'bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white shadow-sm shadow-sky-950',
+  },
+  bash: {
+    cardBorderBg: 'border-fuchsia-500/30 bg-[#120620]/90 hover:border-fuchsia-500/50 shadow-[0_2px_12px_rgba(217,70,239,0.06)]',
+    headerHover: 'hover:bg-fuchsia-950/40 active:bg-fuchsia-950/70',
+    chevron: 'text-fuchsia-400',
+    title: 'text-fuchsia-200',
+    badge: 'bg-fuchsia-950/80 text-fuchsia-300 border-fuchsia-700/50',
+    hintText: 'text-fuchsia-400/80',
+    expandedPanel: 'border-t border-fuchsia-900/50 bg-[#090312]',
+    sectionHeader: 'text-fuchsia-400',
+    syntaxBox: 'bg-[#06020c] border border-fuchsia-900/40 text-fuchsia-200',
+    exampleHighlight: 'text-fuchsia-300',
+    tryButton: 'bg-fuchsia-600 hover:bg-fuchsia-500 active:bg-fuchsia-700 text-white shadow-sm shadow-fuchsia-950',
+  },
+};
+
 export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
   id,
   commandText,
@@ -35,6 +91,8 @@ export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
   onCollapsedComplete,
 }) => {
   const [copied, setCopied] = useState(false);
+  const theme = SHELL_THEMES[shellMode] || SHELL_THEMES.cmd;
+
   const details = React.useMemo(() => {
     return getCommandDetails(commandText, shellMode);
   }, [commandText, shellMode]);
@@ -61,7 +119,7 @@ export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
     <div
       id={id}
       data-explain-card="true"
-      className="explain-card my-1.5 rounded border border-sky-900/50 bg-[#0a1120]/80 transition-colors text-xs font-mono select-none overflow-hidden"
+      className={`explain-card my-1.5 rounded border transition-colors text-xs font-mono select-none overflow-hidden ${theme.cardBorderBg}`}
       onClick={(e) => {
         e.stopPropagation();
       }}
@@ -89,10 +147,10 @@ export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
             onToggle();
           }
         }}
-        className="flex items-center justify-between px-2.5 py-1.5 cursor-pointer hover:bg-sky-900/20 active:bg-sky-900/30 transition-colors"
+        className={`flex items-center justify-between px-2.5 py-1.5 cursor-pointer transition-colors ${theme.headerHover}`}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sky-400 shrink-0">
+          <span className={`${theme.chevron} shrink-0`}>
             {isExpanded ? (
               <ChevronDown className="w-3.5 h-3.5" />
             ) : (
@@ -100,15 +158,15 @@ export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
             )}
           </span>
           <Lightbulb className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-          <span className="font-semibold text-sky-200 truncate">
+          <span className={`font-semibold ${theme.title} truncate`}>
             Explain: <span className="text-white uppercase font-bold">{details.token}</span>
           </span>
-          <span className="hidden xs:inline-block px-1.5 py-0.2 rounded text-[10px] bg-sky-950/80 text-sky-300 border border-sky-800/40">
+          <span className={`hidden xs:inline-block px-1.5 py-0.2 rounded text-[10px] border ${theme.badge}`}>
             {details.category}
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0 text-[10px] text-sky-400/80">
+        <div className={`flex items-center gap-1.5 shrink-0 text-[10px] ${theme.hintText}`}>
           <span className="hidden sm:inline">
             {isExpanded ? 'Tap to collapse' : 'Tap to expand'}
           </span>
@@ -130,12 +188,12 @@ export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
                 onExpandedComplete?.();
               }
             }}
-            className="border-t border-sky-900/40 bg-[#060b14] p-3 text-neutral-300 space-y-2.5 select-text cursor-auto max-h-[min(65vh,420px)] overflow-y-auto"
+            className={`p-3 text-neutral-300 space-y-2.5 select-text cursor-auto max-h-[min(65vh,420px)] overflow-y-auto ${theme.expandedPanel}`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Function / Operation Purpose */}
             <div>
-              <div className="text-[10px] uppercase font-bold tracking-wider text-sky-400 mb-0.5 flex items-center gap-1">
+              <div className={`text-[10px] uppercase font-bold tracking-wider ${theme.sectionHeader} mb-0.5 flex items-center gap-1`}>
                 <span>Operation / Purpose</span>
               </div>
               <p className="text-white/90 leading-relaxed pl-1 text-xs">
@@ -145,7 +203,7 @@ export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
 
             {/* Syntax Box */}
             <div>
-              <div className="text-[10px] uppercase font-bold tracking-wider text-sky-400 mb-1 flex items-center justify-between">
+              <div className={`text-[10px] uppercase font-bold tracking-wider ${theme.sectionHeader} mb-1 flex items-center justify-between`}>
                 <span className="flex items-center gap-1">
                   <Code2 className="w-3 h-3" /> Syntax
                 </span>
@@ -167,7 +225,7 @@ export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
                   )}
                 </button>
               </div>
-              <div className="bg-[#03060a] border border-white/10 rounded px-2.5 py-1.5 font-mono text-xs text-sky-200 overflow-x-auto whitespace-pre">
+              <div className={`rounded px-2.5 py-1.5 font-mono text-xs overflow-x-auto whitespace-pre ${theme.syntaxBox}`}>
                 {details.syntax}
               </div>
             </div>
@@ -188,7 +246,7 @@ export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
               <div className="pt-1 flex flex-wrap items-center justify-between gap-2 border-t border-white/5">
                 <div className="flex items-center gap-1.5 text-xs text-neutral-400 truncate min-w-0">
                   <span className="text-neutral-500 font-bold">Example:</span>
-                  <code className="text-emerald-300 font-bold truncate">{details.example}</code>
+                  <code className={`font-bold truncate ${theme.exampleHighlight}`}>{details.example}</code>
                 </div>
 
                 <div className="flex items-center gap-1.5">
@@ -196,7 +254,7 @@ export const CommandExplainCard: React.FC<CommandExplainCardProps> = ({
                     <button
                       type="button"
                       onClick={(e) => handleTryExample(e, details.example)}
-                      className="px-2 py-1 rounded bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white font-semibold text-xs flex items-center gap-1 transition-colors shadow-sm"
+                      className={`px-2 py-1 rounded font-semibold text-xs flex items-center gap-1 transition-colors ${theme.tryButton}`}
                     >
                       <Play className="w-2.5 h-2.5 fill-current" />
                       <span>Try Example</span>

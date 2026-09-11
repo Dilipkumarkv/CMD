@@ -2,7 +2,7 @@
   "id": "/",
   "name": "SNA Terminal Lab",
   "short_name": "SNA Terminal",
-  "description": "Offline Windows CMD and PowerShell practice lab for System and Network Administration polytechnic students.",
+  "description": "Offline Windows CMD, PowerShell, and Linux Bash practice lab for System and Network Administration polytechnic students.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
