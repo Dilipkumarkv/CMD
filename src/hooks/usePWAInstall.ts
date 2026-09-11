@@ -5,11 +5,24 @@ export interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
+const STORAGE_KEY_INSTALLED = 'sna_pwa_installed';
 const STORAGE_KEY_DISMISSED = 'sna_pwa_install_dismissed';
 
 export function usePWAInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [isInstalled, setIsInstalled] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_INSTALLED) === 'true';
+      const isStandalone =
+        typeof window !== 'undefined' &&
+        (window.matchMedia('(display-mode: standalone)').matches ||
+          (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
+          document.referrer.includes('android-app://'));
+      return stored || isStandalone;
+    } catch {
+      return false;
+    }
+  });
   const [isIOS, setIsIOS] = useState(false);
   const [isDismissed, setIsDismissed] = useState<boolean>(() => {
     try {
@@ -23,8 +36,36 @@ export function usePWAInstall() {
     // Check if running as standalone PWA
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-    setIsInstalled(isStandalone);
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
+      document.referrer.includes('android-app://');
+
+    if (isStandalone) {
+      setIsInstalled(true);
+      try {
+        localStorage.setItem(STORAGE_KEY_INSTALLED, 'true');
+      } catch {
+        // ignore
+      }
+    }
+
+    // Modern Chrome/Edge API to verify if PWA is already installed on the OS
+    if ('getInstalledRelatedApps' in window.navigator) {
+      (navigator as unknown as { getInstalledRelatedApps: () => Promise<unknown[]> })
+        .getInstalledRelatedApps()
+        .then((relatedApps) => {
+          if (relatedApps && relatedApps.length > 0) {
+            setIsInstalled(true);
+            try {
+              localStorage.setItem(STORAGE_KEY_INSTALLED, 'true');
+            } catch {
+              // ignore
+            }
+          }
+        })
+        .catch(() => {
+          // ignore
+        });
+    }
 
     // Detect iOS devices
     const ua = window.navigator.userAgent.toLowerCase();
@@ -41,6 +82,7 @@ export function usePWAInstall() {
       setIsInstalled(true);
       setDeferredPrompt(null);
       try {
+        localStorage.setItem(STORAGE_KEY_INSTALLED, 'true');
         localStorage.removeItem(STORAGE_KEY_DISMISSED);
       } catch {
         // ignore
@@ -74,6 +116,7 @@ export function usePWAInstall() {
         setIsInstalled(true);
         setDeferredPrompt(null);
         try {
+          localStorage.setItem(STORAGE_KEY_INSTALLED, 'true');
           localStorage.removeItem(STORAGE_KEY_DISMISSED);
         } catch {
           // ignore

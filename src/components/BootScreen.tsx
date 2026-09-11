@@ -21,11 +21,11 @@ export const BootScreen: React.FC<BootScreenProps> = ({ onComplete }) => {
   useEffect(() => {
     const logInterval = setInterval(() => {
       setLogIndex((prev) => (prev < BOOT_LOGS.length - 1 ? prev + 1 : prev));
-    }, 1000);
+    }, 550);
 
     const timer = setTimeout(() => {
       setIsVisible(false);
-    }, 5100);
+    }, 2800);
 
     return () => {
       clearInterval(logInterval);
@@ -38,33 +38,28 @@ export const BootScreen: React.FC<BootScreenProps> = ({ onComplete }) => {
       {isVisible && (
         <motion.div
           initial={{ opacity: 1 }}
-          exit={{ opacity: 0, scale: 1.02 }}
-          transition={{ duration: 0.5, ease: 'easeInOut' }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[#070B14] cyber-grid cyber-grid-cmd select-none overflow-hidden"
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.35, ease: 'easeInOut' }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#000000] cyber-grid cyber-grid-cmd select-none overflow-hidden"
         >
-          {/* Subtle Ambient Glow Behind Content */}
-          <div className="absolute w-[360px] h-[360px] rounded-full bg-emerald-500/[0.04] blur-3xl pointer-events-none" />
+          {/* Subtle Ambient Cyber Green Glow Behind Content */}
+          <div className="absolute w-[400px] h-[400px] rounded-full bg-[#00FF66]/[0.07] blur-3xl pointer-events-none" />
 
-          <motion.div
-            initial={{ scale: 0.94, opacity: 0, y: 8 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-            className="flex flex-col items-center justify-center gap-5 p-6 max-w-sm w-full relative z-10"
-          >
-            {/* Terminal Badge with tri-flavor ring glow */}
+          <div className="flex flex-col items-center justify-center gap-5 p-6 max-w-sm w-full relative z-10">
+            {/* Terminal Badge in UHD Black with Glowing Cyber Green Icon */}
             <motion.div
               animate={{
                 boxShadow: [
-                  '0px 0px 0px rgba(16, 185, 129, 0)',
-                  '0px 0px 30px rgba(56, 189, 248, 0.25)',
-                  '0px 0px 0px rgba(16, 185, 129, 0)',
+                  '0px 0px 15px rgba(0, 255, 102, 0.2)',
+                  '0px 0px 35px rgba(0, 255, 102, 0.45)',
+                  '0px 0px 15px rgba(0, 255, 102, 0.2)',
                 ],
               }}
-              transition={{ duration: 2.2, repeat: Infinity }}
-              className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-[#0B1322] border border-white/10 shadow-2xl flex items-center justify-center relative overflow-hidden"
+              transition={{ duration: 2.0, repeat: Infinity, ease: 'easeInOut' }}
+              className="w-18 h-18 rounded-2xl bg-[#000000] border-2 border-[#00FF66]/40 shadow-2xl flex items-center justify-center relative overflow-hidden"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-sky-500/10 to-fuchsia-500/10" />
-              <Terminal className="w-8 h-8 text-emerald-400 relative z-10" strokeWidth={1.75} />
+              <div className="absolute inset-0 bg-radial from-[#00FF66]/15 via-transparent to-transparent pointer-events-none" />
+              <Terminal className="w-9 h-9 text-[#00FF66] relative z-10 drop-shadow-[0_0_12px_rgba(0,255,102,0.9)]" strokeWidth={2} />
             </motion.div>
 
             {/* App Title & Subsystem Status */}
@@ -74,30 +69,30 @@ export const BootScreen: React.FC<BootScreenProps> = ({ onComplete }) => {
               </h1>
 
               {/* Status Pill */}
-              <div className="flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-[11px] font-mono text-neutral-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-                <span>ONLINE · ZERO NETWORK REQ</span>
+              <div className="flex items-center gap-2 px-3 py-0.5 rounded-full bg-[#00FF66]/[0.05] border border-[#00FF66]/20 text-[11px] font-mono text-[#00FF66]">
+                <span className="w-2 h-2 rounded-full bg-[#00FF66] animate-pulse shadow-[0_0_10px_rgba(0,255,102,1)]" />
+                <span className="font-semibold tracking-wider">PWA Virtual Machine</span>
               </div>
             </div>
 
             {/* Boot Sequence Log Text */}
-            <div className="w-full max-w-xs bg-black/40 rounded-lg p-2.5 border border-white/[0.06] font-mono text-[11px] text-neutral-400 h-14 flex flex-col justify-center">
-              <div className="flex items-center gap-1.5 text-emerald-400/90 truncate">
-                <span className="text-neutral-500">&gt;</span>
-                <span className="truncate">{BOOT_LOGS[logIndex]}</span>
+            <div className="w-full max-w-xs bg-black/70 rounded-lg p-2.5 border border-[#00FF66]/15 font-mono text-[11px] text-neutral-300 h-14 flex flex-col justify-center">
+              <div className="flex items-center gap-1.5 text-[#00FF66] truncate">
+                <span className="text-[#00FF66]/60">&gt;</span>
+                <span className="truncate text-neutral-200">{BOOT_LOGS[logIndex]}</span>
               </div>
             </div>
 
-            {/* Loading Bar with Tri-Color Engine Gradient (CMD -> PS -> Bash) */}
-            <div className="w-full max-w-xs h-[3px] bg-white/[0.06] rounded-full overflow-hidden">
+            {/* Loading Bar in Cyber Green Glow */}
+            <div className="w-full max-w-xs h-[3px] bg-[#00FF66]/15 rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: '0%' }}
                 animate={{ width: '100%' }}
-                transition={{ duration: 4.8, ease: 'easeInOut' }}
-                className="h-full bg-gradient-to-r from-emerald-400 via-sky-400 to-fuchsia-400 rounded-full shadow-[0_0_12px_rgba(56,189,248,0.6)]"
+                transition={{ duration: 2.6, ease: 'easeInOut' }}
+                className="h-full bg-gradient-to-r from-[#00FF66] via-emerald-400 to-[#00E676] rounded-full shadow-[0_0_14px_rgba(0,255,102,0.9)]"
               />
             </div>
-          </motion.div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

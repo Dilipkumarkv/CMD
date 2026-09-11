@@ -392,15 +392,13 @@ export function TerminalScreen({
 
     if (isBanner) {
       return (
-        <div key={`${entry.id}-${switchCount ?? 0}`} className="flex flex-col">
-          <DeveloperBanner
-            key={`banner-${entry.shell}-${switchCount ?? 0}`}
-            content={entry.output || ''}
-            shell={entry.shell}
-            isBooting={isBooting}
-            hasCustomColor={Boolean(terminalColors?.fg)}
-          />
-        </div>
+        <DeveloperBanner
+          key={`banner-${entry.shell}-${switchCount ?? 0}`}
+          content={entry.output || ''}
+          shell={entry.shell}
+          isBooting={isBooting}
+          hasCustomColor={Boolean(terminalColors?.fg)}
+        />
       );
     }
 

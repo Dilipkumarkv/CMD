@@ -10,7 +10,7 @@ body,
   overflow: hidden;
   position: fixed;
   inset: 0;
-  background-color: #0B0D10;
+  background-color: #000000;
   touch-action: manipulation;
 }
 

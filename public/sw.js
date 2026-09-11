@@ -1,5 +1,5 @@
 // SNA Terminal Lab - Offline-First Service Worker
-const CACHE_NAME = 'sna-terminal-cache-v4';
+const CACHE_NAME = 'sna-terminal-cache-v5';
 
 const STATIC_PRECACHE = [
   '/',

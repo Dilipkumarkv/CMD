@@ -1,5 +1,7 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertTriangle, RotateCcw, X } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ResetModalProps {
   isOpen: boolean;
@@ -8,7 +10,53 @@ interface ResetModalProps {
 }
 
 export function ResetModal({ isOpen, onClose, onConfirm }: ResetModalProps) {
-  return (
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Push history state on open so Back button closes modal
+  useEffect(() => {
+    if (!isOpen) return;
+
+    try {
+      window.history.pushState({ modal: 'reset-lab' }, '');
+    } catch {
+      // ignore
+    }
+
+    const handlePopState = () => {
+      onClose();
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  const handleClose = useCallback(() => {
+    onClose();
+    try {
+      if (window.history.state?.modal === 'reset-lab') {
+        window.history.back();
+      }
+    } catch {
+      // ignore
+    }
+  }, [onClose]);
+
+  const modalMarkup = (
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -16,8 +64,8 @@ export function ResetModal({ isOpen, onClose, onConfirm }: ResetModalProps) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          onClick={onClose}
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={handleClose}
+          className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4 cursor-pointer"
         >
           <motion.div
             initial={{ opacity: 0, y: "100%" }}
@@ -28,11 +76,11 @@ export function ResetModal({ isOpen, onClose, onConfirm }: ResetModalProps) {
             id="reset-lab-dialog"
             role="dialog"
             aria-modal="true"
-            className="w-full sm:max-w-sm bg-[#18181b] sm:rounded-xl rounded-t-xl rounded-b-none p-5 sm:p-6 text-neutral-100 space-y-5 border-t sm:border border-rose-900/40 shadow-[0_-10px_40px_-15px_rgba(225,29,72,0.2)] sm:shadow-2xl"
+            className="w-full sm:max-w-sm bg-[#18181b] sm:rounded-xl rounded-t-xl rounded-b-none p-5 sm:p-6 text-neutral-100 space-y-5 border-t sm:border border-rose-900/40 shadow-[0_-10px_40px_-15px_rgba(225,29,72,0.2)] sm:shadow-2xl cursor-default"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500">
+                <div className="p-2 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 shrink-0">
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
@@ -42,10 +90,11 @@ export function ResetModal({ isOpen, onClose, onConfirm }: ResetModalProps) {
               </div>
               <button
                 type="button"
-                onClick={onClose}
-                className="p-1 rounded text-neutral-500 hover:text-white hover:bg-white/10 transition-colors"
+                onClick={handleClose}
+                className="w-10 h-10 min-w-[44px] min-h-[44px] -mr-2 -mt-2 flex items-center justify-center rounded-lg text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="Close dialog"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             
@@ -63,8 +112,8 @@ export function ResetModal({ isOpen, onClose, onConfirm }: ResetModalProps) {
             <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-2">
               <button
                 type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-lg text-xs font-semibold bg-white/5 hover:bg-white/10 text-neutral-300 transition-colors"
+                onClick={handleClose}
+                className="min-h-[44px] px-4 py-2 rounded-lg text-xs font-semibold bg-white/5 hover:bg-white/10 text-neutral-300 transition-colors flex items-center justify-center"
               >
                 Cancel
               </button>
@@ -74,9 +123,9 @@ export function ResetModal({ isOpen, onClose, onConfirm }: ResetModalProps) {
                 id="confirm-reset-btn"
                 onClick={() => {
                   onConfirm();
-                  onClose();
+                  handleClose();
                 }}
-                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition-colors shadow-[0_0_15px_rgba(225,29,72,0.4)] hover:shadow-[0_0_20px_rgba(225,29,72,0.6)]"
+                className="min-h-[44px] flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition-colors shadow-[0_0_15px_rgba(225,29,72,0.4)] hover:shadow-[0_0_20px_rgba(225,29,72,0.6)]"
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Reset Environment</span>
@@ -87,4 +136,7 @@ export function ResetModal({ isOpen, onClose, onConfirm }: ResetModalProps) {
       )}
     </AnimatePresence>
   );
+
+  if (!mounted || typeof document === 'undefined') return null;
+  return createPortal(modalMarkup, document.body);
 }

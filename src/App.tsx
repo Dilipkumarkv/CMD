@@ -691,7 +691,7 @@ export default function App() {
         height: viewportHeight ? `${viewportHeight}px` : '100dvh',
         maxHeight: viewportHeight ? `${viewportHeight}px` : '100dvh',
       }}
-      className="w-full flex flex-col overflow-hidden font-mono select-text bg-[#0B0D10] text-[#cccccc] fixed top-0 left-0 right-0 z-0"
+      className="w-full flex flex-col overflow-hidden font-mono select-text bg-[#000000] text-[#cccccc] fixed top-0 left-0 right-0 z-0"
     >
       {isBooting && <BootScreen onComplete={() => setIsBooting(false)} />}
       

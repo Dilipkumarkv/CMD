@@ -1,177 +1,150 @@
+import sharp from 'sharp';
 import fs from 'fs';
-import zlib from 'zlib';
+import path from 'path';
 
-function crc32(buf) {
-  let crc = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) {
-    crc ^= buf[i];
-    for (let j = 0; j < 8; j++) {
-      crc = (crc >>> 1) ^ (-(crc & 1) & 0xedb88320);
-    }
-  }
-  return (crc ^ 0xffffffff) >>> 0;
+// 1. Standard SVG Icon (UHD Pitch Black Background with Cyber Green Terminal Logo)
+const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Cyber Green Radial Glow on UHD Black -->
+    <radialGradient id="cyberGlow" cx="50%" cy="58%" r="48%">
+      <stop offset="0%" stop-color="#00FF66" stop-opacity="0.22" />
+      <stop offset="60%" stop-color="#00FF66" stop-opacity="0.05" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+    <!-- Cyber Green Linear Gradient for Prompt & Cursor -->
+    <linearGradient id="cyberGreenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#39FF14" />
+      <stop offset="50%" stop-color="#00FF66" />
+      <stop offset="100%" stop-color="#00E676" />
+    </linearGradient>
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- UHD Pitch Black Outer Canvas -->
+  <rect width="512" height="512" rx="100" fill="#000000" />
+  
+  <!-- Subtle Cyber Green Border Ring -->
+  <rect x="12" y="12" width="488" height="488" rx="88" fill="#030704" stroke="#00FF66" stroke-opacity="0.28" stroke-width="4" />
+
+  <!-- Ambient Glow in Terminal Screen Area -->
+  <circle cx="256" cy="270" r="190" fill="url(#cyberGlow)" />
+
+  <!-- Authentic Terminal Window Titlebar Bar -->
+  <path d="M16 98 C16 50 50 16 98 16 L414 16 C462 16 496 50 496 98 L496 112 L16 112 Z" fill="#0a0f0c" />
+  <line x1="16" y1="112" x2="496" y2="112" stroke="#00FF66" stroke-opacity="0.25" stroke-width="2" />
+
+  <!-- Terminal Window Controls -->
+  <circle cx="62" cy="64" r="13" fill="#FF5F56" />
+  <circle cx="106" cy="64" r="13" fill="#FFBD2E" />
+  <circle cx="150" cy="64" r="13" fill="#00FF66" />
+
+  <!-- Title text in Titlebar -->
+  <text x="256" y="72" fill="#00FF66" fill-opacity="0.75" font-family="ui-monospace, monospace" font-size="20" font-weight="700" letter-spacing="1.5" text-anchor="middle">SNA_TERMINAL</text>
+
+  <!-- Cyber Green Terminal Prompt Chevron (>) -->
+  <path d="M125 210 L235 300 L125 390" fill="none" stroke="url(#cyberGreenGrad)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round" filter="url(#neonGlow)" />
+
+  <!-- Cyber Green Terminal Cursor Underscore (_) -->
+  <line x1="275" y1="390" x2="395" y2="390" stroke="url(#cyberGreenGrad)" stroke-width="38" stroke-linecap="round" filter="url(#neonGlow)" />
+
+  <!-- Subtle status prompt text on terminal body -->
+  <text x="125" y="165" fill="#00FF66" fill-opacity="0.4" font-family="ui-monospace, monospace" font-size="16" font-weight="600" letter-spacing="2">ROOT@POLYTECHNIC:~#</text>
+</svg>`;
+
+// 2. Full-Bleed Maskable SVG for Android (No rounded corners, safe-zone centered)
+const maskableSvgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <radialGradient id="maskGlow" cx="50%" cy="52%" r="45%">
+      <stop offset="0%" stop-color="#00FF66" stop-opacity="0.28" />
+      <stop offset="60%" stop-color="#00FF66" stop-opacity="0.06" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="cyberGreenGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#39FF14" />
+      <stop offset="50%" stop-color="#00FF66" />
+      <stop offset="100%" stop-color="#00E676" />
+    </linearGradient>
+    <filter id="neonGlow2" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Full bleed UHD Pitch Black Background (Edge to Edge, 0 radius) -->
+  <rect width="512" height="512" fill="#000000" />
+
+  <!-- Safe-zone radial background -->
+  <circle cx="256" cy="256" r="185" fill="url(#maskGlow)" />
+
+  <!-- Terminal Window Outer Frame inside 80% Safe Zone (256 +/- 170 => 86 to 426) -->
+  <rect x="76" y="90" width="360" height="320" rx="36" fill="#040906" stroke="#00FF66" stroke-opacity="0.4" stroke-width="4" />
+
+  <!-- Title bar inside safe zone -->
+  <path d="M76 126 C76 106 92 90 112 90 L400 90 C420 90 436 106 436 126 L436 142 L76 142 Z" fill="#09140c" />
+  <line x1="76" y1="142" x2="436" y2="142" stroke="#00FF66" stroke-opacity="0.3" stroke-width="2" />
+
+  <!-- Window dots -->
+  <circle cx="112" cy="116" r="9" fill="#FF5F56" />
+  <circle cx="142" cy="116" r="9" fill="#FFBD2E" />
+  <circle cx="172" cy="116" r="9" fill="#00FF66" />
+
+  <text x="290" y="122" fill="#00FF66" fill-opacity="0.8" font-family="ui-monospace, monospace" font-size="15" font-weight="700" letter-spacing="1" text-anchor="middle">SNA_TERM</text>
+
+  <!-- Prominent Cyber Green Chevron Prompt (Inside Safe Zone) -->
+  <path d="M140 215 L225 285 L140 355" fill="none" stroke="url(#cyberGreenGrad2)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" filter="url(#neonGlow2)" />
+
+  <!-- Cyber Green Cursor Underscore (Inside Safe Zone) -->
+  <line x1="260" y1="355" x2="360" y2="355" stroke="url(#cyberGreenGrad2)" stroke-width="32" stroke-linecap="round" filter="url(#neonGlow2)" />
+</svg>`;
+
+async function main() {
+  const publicDir = path.resolve(process.cwd(), 'public');
+
+  // Save SVG
+  fs.writeFileSync(path.join(publicDir, 'icon.svg'), svgContent, 'utf-8');
+  console.log('Generated public/icon.svg');
+
+  // Generate 512x512 PNG
+  await sharp(Buffer.from(svgContent))
+    .resize(512, 512)
+    .png({ quality: 100 })
+    .toFile(path.join(publicDir, 'pwa-512x512.png'));
+  console.log('Generated public/pwa-512x512.png');
+
+  // Generate 192x192 PNG
+  await sharp(Buffer.from(svgContent))
+    .resize(192, 192)
+    .png({ quality: 100 })
+    .toFile(path.join(publicDir, 'pwa-192x192.png'));
+  console.log('Generated public/pwa-192x192.png');
+
+  // Generate Apple Touch Icon 180x180 PNG
+  await sharp(Buffer.from(svgContent))
+    .resize(180, 180)
+    .png({ quality: 100 })
+    .toFile(path.join(publicDir, 'apple-touch-icon.png'));
+  console.log('Generated public/apple-touch-icon.png');
+
+  // Generate Maskable 512x512 PNG for Android
+  await sharp(Buffer.from(maskableSvgContent))
+    .resize(512, 512)
+    .png({ quality: 100 })
+    .toFile(path.join(publicDir, 'pwa-maskable-512x512.png'));
+  console.log('Generated public/pwa-maskable-512x512.png');
+
+  console.log('All UHD Black & Cyber Green icons successfully generated!');
 }
 
-function makeChunk(type, data) {
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(data.length, 0);
-  const typeBuf = Buffer.from(type, 'ascii');
-  const crcBuf = Buffer.alloc(4);
-  const crc = crc32(Buffer.concat([typeBuf, data]));
-  crcBuf.writeUInt32BE(crc, 0);
-  return Buffer.concat([len, typeBuf, data, crcBuf]);
-}
-
-function createTerminalIconPng(size) {
-  // RGBA buffer: size * (1 + size * 4) bytes
-  const rawData = Buffer.alloc(size * (1 + size * 4));
-  let offset = 0;
-
-  const bgR = 12, bgG = 36, bgB = 86; // #0c2456 dark navy terminal
-  const borderR = 14, borderG = 165, borderB = 233; // #0ea5e9 sky cyan
-  const promptR = 56, promptG = 189, promptB = 248; // #38bdf8 sky-400
-  const cursorR = 34, cursorG = 197, cursorB = 94; // #22c55e emerald
-
-  const cornerRadius = size * 0.18;
-  const padding = size * 0.12;
-
-  for (let y = 0; y < size; y++) {
-    rawData[offset++] = 0; // Filter byte: 0 (None)
-
-    for (let x = 0; x < size; x++) {
-      let r = 0, g = 0, b = 0, a = 0;
-
-      // Rounded rect boundary check
-      let inCard = false;
-      let dx = 0, dy = 0;
-      if (x < cornerRadius) dx = cornerRadius - x;
-      else if (x > size - 1 - cornerRadius) dx = x - (size - 1 - cornerRadius);
-      if (y < cornerRadius) dy = cornerRadius - y;
-      else if (y > size - 1 - cornerRadius) dy = y - (size - 1 - cornerRadius);
-
-      if (dx * dx + dy * dy <= cornerRadius * cornerRadius || (dx === 0 || dy === 0)) {
-        inCard = true;
-      }
-
-      if (inCard) {
-        // Base dark navy terminal color
-        r = bgR;
-        g = bgG;
-        b = bgB;
-        a = 255;
-
-        // Subtle gradient towards bottom
-        const grad = Math.floor((y / size) * 30);
-        r = Math.max(8, r - grad);
-        g = Math.max(20, g - grad);
-        b = Math.max(50, b - grad);
-
-        // Border
-        const isBorder = (
-          x < 4 || x >= size - 4 || y < 4 || y >= size - 4 ||
-          (dx > 0 && dy > 0 && Math.abs(Math.sqrt(dx * dx + dy * dy) - cornerRadius) < 4)
-        );
-        if (isBorder) {
-          r = borderR;
-          g = borderG;
-          b = borderB;
-        }
-
-        // Top bar title / window dots
-        const topBarHeight = size * 0.22;
-        if (y < topBarHeight) {
-          r = Math.floor(r * 0.7);
-          g = Math.floor(g * 0.7);
-          b = Math.floor(b * 0.7);
-
-          // 3 small dots
-          const dotY = topBarHeight * 0.5;
-          const dotRadius = size * 0.035;
-          const d1X = size * 0.18;
-          const d2X = size * 0.28;
-          const d3X = size * 0.38;
-
-          const dist1 = Math.hypot(x - d1X, y - dotY);
-          const dist2 = Math.hypot(x - d2X, y - dotY);
-          const dist3 = Math.hypot(x - d3X, y - dotY);
-
-          if (dist1 <= dotRadius) { r = 239; g = 68; b = 68; } // Red dot
-          else if (dist2 <= dotRadius) { r = 245; g = 158; b = 11; } // Amber dot
-          else if (dist3 <= dotRadius) { r = 34; g = 197; b = 94; } // Green dot
-        }
-
-        // Draw '>' chevron prompt symbol in center
-        // Chevron vertices: (x1, y1) -> (x2, y2) -> (x3, y3)
-        const chevX1 = size * 0.24;
-        const chevY1 = size * 0.38;
-        const chevX2 = size * 0.44;
-        const chevY2 = size * 0.56;
-        const chevY3 = size * 0.74;
-        const thick = size * 0.055;
-
-        // Top leg of chevron
-        if (y >= chevY1 && y <= chevY2) {
-          const targetX = chevX1 + ((y - chevY1) / (chevY2 - chevY1)) * (chevX2 - chevX1);
-          if (Math.abs(x - targetX) < thick) {
-            r = promptR; g = promptG; b = promptB;
-          }
-        }
-        // Bottom leg of chevron
-        if (y >= chevY2 && y <= chevY3) {
-          const targetX = chevX2 - ((y - chevY2) / (chevY3 - chevY2)) * (chevX2 - chevX1);
-          if (Math.abs(x - targetX) < thick) {
-            r = promptR; g = promptG; b = promptB;
-          }
-        }
-
-        // Draw '_' underscore cursor
-        const cursorX1 = size * 0.52;
-        const cursorX2 = size * 0.78;
-        const cursorY = size * 0.70;
-        const cursorH = size * 0.06;
-
-        if (x >= cursorX1 && x <= cursorX2 && y >= cursorY && y <= cursorY + cursorH) {
-          r = cursorR; g = cursorG; b = cursorB;
-        }
-      }
-
-      rawData[offset++] = r;
-      rawData[offset++] = g;
-      rawData[offset++] = b;
-      rawData[offset++] = a;
-    }
-  }
-
-  const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-  // IHDR
-  const ihdrData = Buffer.alloc(13);
-  ihdrData.writeUInt32BE(size, 0);
-  ihdrData.writeUInt32BE(size, 4);
-  ihdrData[8] = 8; // Bit depth: 8
-  ihdrData[9] = 6; // ColorType: 6 (RGBA)
-  ihdrData[10] = 0; // Compression
-  ihdrData[11] = 0; // Filter
-  ihdrData[12] = 0; // Interlace
-  const ihdrChunk = makeChunk('IHDR', ihdrData);
-
-  // IDAT
-  const compressed = zlib.deflateSync(rawData, { level: 9 });
-  const idatChunk = makeChunk('IDAT', compressed);
-
-  // IEND
-  const iendChunk = makeChunk('IEND', Buffer.alloc(0));
-
-  return Buffer.concat([pngHeader, ihdrChunk, idatChunk, iendChunk]);
-}
-
-// Generate icons
-const icon192 = createTerminalIconPng(192);
-const icon512 = createTerminalIconPng(512);
-const appleIcon = createTerminalIconPng(180);
-
-fs.writeFileSync('public/pwa-192x192.png', icon192);
-fs.writeFileSync('public/pwa-512x512.png', icon512);
-fs.writeFileSync('public/pwa-maskable-512x512.png', icon512);
-fs.writeFileSync('public/apple-touch-icon.png', appleIcon);
-console.log('Successfully generated PNG icons in /public');
+main().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
